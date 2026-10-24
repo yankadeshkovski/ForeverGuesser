@@ -99,7 +99,7 @@ export default function Landing() {
       <div className="scroll-line"><span style={{ transform: `scaleX(${progress})` }} /></div>
       <nav className="topbar">
         <a className="wordmark" href="#top"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
-        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#game">Play Guesser</a><a href="#why">Why it matters</a></div>
+        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#why">Why it matters</a></div>
       </nav>
 
       <section className="hero wrap" id="top">
@@ -107,7 +107,7 @@ export default function Landing() {
           <div className="eyebrow"><span className="live-dot" /> PFAS / FOREVER CHEMICALS</div>
           <h1>Some things<br /><em>never leave.</em></h1>
           <p className="hero-lede">Explore the chemistry behind the world&apos;s most UN-forgettable chemicals—then see where they go.</p>
-          <div className="hero-actions"><a className="button button-lime" href="#/page2"><Beaker size={17} /> Talk with Atom</a><a className="button button-quiet" href="#game"><Play size={15} fill="currentColor" /> Play Guesser</a></div>
+          <div className="hero-actions"><a className="button button-lime" href="#/page2"><Beaker size={17} /> Talk with Atom</a><a className="button button-quiet" href="#/page3"><Play size={15} fill="currentColor" /> Play Guesser</a></div>
         </div>
         <div className="hero-specimen"><div className="specimen-grid" /><MolecularViewer /><div className="specimen-caption"><span>PFOA + PFOS / RDKit 3D</span><span>DRAG TO ROTATE</span></div></div>
       </section>
@@ -118,7 +118,7 @@ export default function Landing() {
 
       <section className="experiences wrap" id="sandbox"><div className="section-heading"><span className="eyebrow">Look closer</span><h2>Start with a molecule.<br /><span>Leave with a map.</span></h2></div><div className="experience-list">
         <a className="experience-row" href="#/page2"><span className="experience-index">01</span><div className="experience-panel"><div className="panel-kicker"><Beaker size={14} /> MOLECULAR CONTEXT</div><h3>Talk with Atom</h3><p>Enter a compound, see its structure rendered in 3D, and let AI explain what it is, whether it is PFAS, where it is commonly found, and why that context matters.</p><span className="experience-action">Explore the compound <ArrowUpRight size={14} /></span></div><ArrowUpRight /></a>
-        <a className="experience-row" href="#game" id="game"><span className="experience-index">02</span><div className="experience-panel panel-map"><div className="panel-kicker"><Play size={13} fill="currentColor" /> GEOGRAPHIC SIGNAL</div><h3>Play Guesser</h3><p>Study the clues, drop a pin on the map, and predict where PFAS levels are highest. Reveal the heat map to see how close you were.</p><span className="experience-action">Find the hotspot <ArrowUpRight size={14} /></span></div><ArrowUpRight /></a>
+        <a className="experience-row" href="#/page3" id="game"><span className="experience-index">02</span><div className="experience-panel panel-map"><div className="panel-kicker"><Play size={13} fill="currentColor" /> GEOGRAPHIC SIGNAL</div><h3>Play Guesser</h3><p>Study the clues, drop a pin on the map, and predict where PFAS levels are highest. Reveal the heat map to see how close you were.</p><span className="experience-action">Find the hotspot <ArrowUpRight size={14} /></span></div><ArrowUpRight /></a>
       </div></section>
       <footer className="footer wrap"><a className="wordmark" href="#top"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a><p>Understanding what stays with us.</p><span className="footer-code">FG / 001 / 2026</span></footer>
     </main>
