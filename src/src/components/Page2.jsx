@@ -79,6 +79,12 @@ function Page2() {
     <main className="p2">
       <h1>Page 2</h1>
       <a href="#/">Back to landing</a>
+      <span className="info">
+        i
+        <span className="info-popup">
+          {answer ?? 'THIS IS HOW TO USE SMILE STRINGS... '}
+        </span>
+      </span>
 
       <section id="center">
         <form onSubmit={handleSearch} className="search">
