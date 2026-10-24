@@ -115,11 +115,6 @@ function Page2() {
               </ul>
             )}
           </div>
-
-          <button type="submit" disabled={loading || !query.trim()}>
-            {loading ? 'Searching…' : 'Search'}
-          </button>
-
         </form>
 
         {error && <p className="error" role="alert">{error}</p>}
