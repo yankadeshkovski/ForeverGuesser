@@ -126,6 +126,5 @@ async def ask(request: Request):
     except Exception as e:
         raise HTTPException(502, f"Gemma request failed: {e}")
 
-    # return {"answer": response.text}
     print(response.text)
-    return {"answer": "This is a placeholder response. The AI model integration is currently commented out."}
+    return {"answer": response.text}

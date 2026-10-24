@@ -36,6 +36,9 @@ function Page2() {
   const [loading, setLoading] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const [answerLoading, setAnswerLoading] = useState(false)
+  const [answerError, setAnswerError] = useState(null)
+  const requestId = useRef(0)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -57,23 +60,43 @@ function Page2() {
   }
 
   async function handleSearch(e) {
-    e.preventDefault()
-    const smiles = query.trim()
-    if (!smiles) return
+  e.preventDefault()
+  const smiles = query.trim()
+  if (!smiles) return
 
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setAnswer(null)
-    try {
-      setResult(await getMolecule(smiles))
-      setAnswer(await ask(smiles))
-    } catch (err) {
-      setError(err.message)   // keep the previous result visible
-    } finally {
+  const id = ++requestId.current
+  setLoading(true)
+  setError(null)
+  setResult(null)
+  setAnswer(null)
+  setAnswerError(null)
+
+  // 1. Molecule data and 3D viewer
+  try {
+    const mol = await getMolecule(smiles)
+    if (id !== requestId.current) return
+    setResult(mol)
+    setLoading(false)
+  } catch (err) {
+    if (id === requestId.current) {
+      setError(err.message)
       setLoading(false)
     }
+    return
   }
+
+  // 2. AI / preset explanation
+  setAnswerLoading(true)
+  try {
+    const res = await ask(smiles)
+    if (id !== requestId.current) return
+    setAnswer(typeof res === 'string' ? res : res.answer)
+  } catch (err) {
+    if (id === requestId.current) setAnswerError(err.message)
+  } finally {
+    if (id === requestId.current) setAnswerLoading(false)
+  }
+}
 
   return (
     <main className="p2">
@@ -136,6 +159,21 @@ function Page2() {
             </p>
             <p className="smiles">{result.canonical_smiles}</p>
             <MolViewer molblock={result.molblock} />
+            <section className="answer">
+                {answerLoading && (
+                  <p className="answer-loading" role="status" aria-live="polite">
+                    Generating explanation…
+                  </p>
+                )}
+
+              {answerError && (
+                <p className="error" role="alert">
+                  Explanation unavailable right now. ({answerError})
+                </p>
+              )}
+
+              {answer && <p className="answer-text">{answer}</p>}
+            </section>
           </>
         )}
       </section>
