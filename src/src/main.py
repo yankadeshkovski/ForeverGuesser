@@ -22,7 +22,7 @@ def hello():
 def add(data: dict):
     return {"result": data["a"] + data["b"]}
 
-@app.post("/api/getMolecule")
+@app.get("/api/getMolecule")
 def getMolecule():
     pfoa = Chem.MolFromSmiles("OC(=O)" + "C(F)(F)" * 6 + "C(F)(F)F")        # PFOA (carboxylic acid)
     #pfos = Chem.MolFromSmiles("OS(=O)(=O)" + "C(F)(F)" * 7 + "C(F)(F)F")    # PFOS (sulfonic acid)
@@ -33,6 +33,6 @@ def getMolecule():
     mol = Chem.AddHs(pfoa)
     AllChem.EmbedMolecule(mol, AllChem.ETKDG())
     AllChem.MMFFOptimizeMolecule(mol)      # quick geometry cleanup
-    molblock = Chem.MolToMolBlock(mol)     # 3D coordinates as text
+        # 3D coordinates as text
 
-    return molblock
+    return {"molblock": Chem.MolToMolBlock(mol)}
