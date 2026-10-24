@@ -8,12 +8,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem, rdMolDescriptors
-from pfas_data import get_preset_response
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-GEMMA_MODEL = "gemma-4-26b-a4b-it"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 app = FastAPI()
 
@@ -29,8 +28,9 @@ app.add_middleware(
 # methyl (-CF3) or methylene (-CF2-) carbon, i.e. a saturated carbon with
 # at least 2 F and no H, Cl, Br, or I attached.
 PFAS_PATTERN = Chem.MolFromSmarts("[CX4;H0;!$(C[Cl,Br,I])](F)(F)")
-
 MAX_HEAVY_ATOMS = 200
+MAX_HISTORY_TURNS = 20
+MAX_MESSAGE_CHARS = 500
 
 @app.post("/api/molecule")
 async def get_molecule(request: Request):
@@ -79,8 +79,25 @@ async def get_molecule(request: Request):
         "pfas_group_count": len(pfas_matches),
         "formula": rdMolDescriptors.CalcMolFormula(mol),
         "mol_weight": round(Descriptors.MolWt(mol), 2),
-        "canonical_smiles": Chem.MolToSmiles(mol),
     }
+
+def build_system_instruction(smiles: str, is_pfas: bool) -> str:
+    status = "is" if is_pfas else "is not"
+    return (
+        f"You are a molecule with SMILES {smiles}, which {status} classified as a PFAS molecule. "
+        "Stay in the first-person molecule persona at all times. "
+        "Only write in complete sentences and limit every answer to 4 sentences or fewer. "
+        "If you are not a PFAS molecule, say 'I am not a PFAS molecule.' and explain why. "
+        "If you are a PFAS molecule, be ready to explain your full name, "
+        "common uses, where you become a pollutant (with specific examples), and why you are "
+        "dangerous to humans or the ecosystem. "
+        "Answer the user's follow-up questions in character."
+    )
+
+INTRO_PROMPT = (
+    "Introduce yourself: give your name, what you're used for, "
+    "where you become a pollutant, and why you're a concern (or why you're not a PFAS)."
+)
 
 @app.post("/api/ask")
 async def ask(request: Request):
@@ -99,32 +116,41 @@ async def ask(request: Request):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise HTTPException(400, f"'{smiles}' isn't a valid SMILES string.")
+    is_pfas = mol.HasSubstructMatch(PFAS_PATTERN)
 
-    cached = get_preset_response(smiles)
-    if cached:
-        print(cached)
-        return {"answer": cached, "source": "preset"}
+    # Optional new user message and prior turns
+    message = data.get("message")
+    history = data.get("history") or []
+    if not isinstance(history, list):
+        raise HTTPException(400, "history must be a list.")
+    history = history[-MAX_HISTORY_TURNS:]
 
-    is_pfas = "is" if mol.HasSubstructMatch(PFAS_PATTERN) else "is not"
+    # Always start with the intro turn so the conversation begins with a user role
+    contents = [types.Content(role="user", parts=[types.Part(text=INTRO_PROMPT)])]
 
-    prompt = (f"You are a molecule with SMILE {smiles.strip()} which {is_pfas} classified as a PFAS molecule. If you are not a PFAS molecule, say \'I am not a PFAS molecule.\'" +
-              " and explain why. If you are a PFAS molecule, answer the following questions: What is the full name of the PFAS molecule? What is the chemical formula?" + 
-              "What is this PFAS molecule commonly used for? Where can it become a pollutant, give specific examples? Why is this molecule dangerous to humans or the ecosystem?")
+    for turn in history:
+        role = turn.get("role") if isinstance(turn, dict) else None
+        text = turn.get("text") if isinstance(turn, dict) else None
+        if role not in ("user", "model") or not isinstance(text, str):
+            raise HTTPException(400, "Each history item needs role ('user'|'model') and text.")
+        contents.append(types.Content(role=role, parts=[types.Part(text=text)]))
+
+    if message is not None:
+        if not isinstance(message, str) or not message.strip():
+            raise HTTPException(400, "message must be a non-empty string.")
+        if len(message) > MAX_MESSAGE_CHARS:
+            raise HTTPException(400, f"Message too long (max {MAX_MESSAGE_CHARS} characters).")
+        contents.append(types.Content(role="user", parts=[types.Part(text=message.strip())]))
 
     try:
-        start = time.time()
         response = client.models.generate_content(
-            model=GEMMA_MODEL,
-            contents=prompt,
+            model=GEMINI_MODEL,
+            contents=contents,
             config=types.GenerateContentConfig(
-            system_instruction="Only write in complete sentences and limit the answer to 6 or fewer. Answer in the first person.",
-            thinking_config=types.ThinkingConfig(thinking_level="high"),
-            )
+                system_instruction=build_system_instruction(smiles, is_pfas),
+            ),
         )
-        end = time.time()
-        print(start - end)
     except Exception as e:
-        raise HTTPException(502, f"Gemma request failed: {e}")
+        raise HTTPException(502, f"Gemini request failed: {e}")
 
-    print(response.text)
     return {"answer": response.text}

@@ -169,6 +169,11 @@
 .p2-dock a:hover { color: var(--paper); background: rgba(255, 255, 255, .07); }
 .p2-dock a[aria-current="page"] { color: var(--ink); background: var(--lime); }
 
+/* ── Chat ───────────────────────────*/
+.p2-chat { display: flex; gap: 8px; margin-top: 10px; }
+.p2-chat input { flex: 1; min-width: 0; }
+.p2-asked { margin: 8px 4px 0; font-size: 0.8rem; opacity: 0.7; }
+
 /* ── Motion ────────────────────────────────── */
 @keyframes p2-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes p2-pop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
