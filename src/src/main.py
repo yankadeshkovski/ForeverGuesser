@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem, rdMolDescriptors
+from pfas_data import get_preset_response
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -87,27 +88,28 @@ async def ask(request: Request):
         data = await request.json()
     except Exception:
         raise HTTPException(400, "Request body must be valid JSON.")
-
     if not isinstance(data, dict):
         raise HTTPException(400, "Request body must be a JSON object.")
 
     smiles = data.get("smiles")
-    mol = Chem.MolFromSmiles(smiles)
-    pfas_matches = mol.GetSubstructMatches(PFAS_PATTERN)
-
-    if pfas_matches:
-        is_pfas = "is"
-    else:
-        is_pfas = "is not"
-
     if not isinstance(smiles, str) or not smiles.strip():
         raise HTTPException(400, "Missing smiles.")
+    smiles = smiles.strip()
 
-    verdict = "is" if is_pfas else "is not"
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise HTTPException(400, f"'{smiles}' isn't a valid SMILES string.")
+
+    cached = get_preset_response(smiles)
+    if cached:
+        print(cached)
+        return {"answer": cached, "source": "preset"}
+
+    is_pfas = "is" if mol.HasSubstructMatch(PFAS_PATTERN) else "is not"
 
     prompt = (f"You are a molecule with SMILE {smiles.strip()} which {is_pfas} classified as a PFAS molecule. If you are not a PFAS molecule, say \'I am not a PFAS molecule.\'" +
               " and explain why. If you are a PFAS molecule, answer the following questions: What is the full name of the PFAS molecule? What is the chemical formula?" + 
-              "What is this PFAS molecule commonly used for? Where can it become a pollutant, Xgive specific examples? Why is this molecule dangerous to humans or the ecosystem?")
+              "What is this PFAS molecule commonly used for? Where can it become a pollutant, give specific examples? Why is this molecule dangerous to humans or the ecosystem?")
 
     try:
         start = time.time()
@@ -115,7 +117,7 @@ async def ask(request: Request):
             model=GEMMA_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
-            system_instruction="Only write in complete sentences and limit the answer to 6 or less sentences.",
+            system_instruction="Only write in complete sentences and limit the answer to 6 or fewer. Answer in the first person.",
             thinking_config=types.ThinkingConfig(thinking_level="high"),
             )
         )
