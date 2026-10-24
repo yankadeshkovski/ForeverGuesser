@@ -71,7 +71,7 @@ async def get_molecule(request: Request):
         "mol_weight": round(Descriptors.MolWt(mol), 2),
         "canonical_smiles": Chem.MolToSmiles(mol),
     }
-
+# test branch... 
 ''' @app.get("/api/getMolecule")
 def getMolecule():
     pfoa = Chem.MolFromSmiles("OC(=O)" + "C(F)(F)" * 6 + "C(F)(F)F")        # PFOA (carboxylic acid)
