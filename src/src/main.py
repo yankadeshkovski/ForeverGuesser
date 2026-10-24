@@ -1,8 +1,18 @@
 # main.py
+import os
+import time
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem, rdMolDescriptors
+
+load_dotenv()
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+GEMMA_MODEL = "gemma-4-26b-a4b-it"
 
 app = FastAPI()
 
@@ -23,7 +33,6 @@ MAX_HEAVY_ATOMS = 200
 
 @app.post("/api/molecule")
 async def get_molecule(request: Request):
-    # Parse the body ourselves instead of using a pydantic model
     try:
         data = await request.json()
     except Exception:
@@ -72,17 +81,49 @@ async def get_molecule(request: Request):
         "canonical_smiles": Chem.MolToSmiles(mol),
     }
 
-''' @app.get("/api/getMolecule")
-def getMolecule():
-    pfoa = Chem.MolFromSmiles("OC(=O)" + "C(F)(F)" * 6 + "C(F)(F)F")        # PFOA (carboxylic acid)
-    #pfos = Chem.MolFromSmiles("OS(=O)(=O)" + "C(F)(F)" * 7 + "C(F)(F)F")    # PFOS (sulfonic acid)
+@app.post("/api/ask")
+async def ask(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(400, "Request body must be valid JSON.")
 
-    #for name, mol in [("PFOA", pfoa), ("PFOS", pfos)]:
-    #    print(name, Descriptors.MolWt(mol), Descriptors.MolLogP(mol))
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Request body must be a JSON object.")
 
-    mol = Chem.AddHs(pfoa)
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    AllChem.MMFFOptimizeMolecule(mol)      # quick geometry cleanup
-        # 3D coordinates as text
+    smiles = data.get("smiles")
+    mol = Chem.MolFromSmiles(smiles)
+    pfas_matches = mol.GetSubstructMatches(PFAS_PATTERN)
 
-    return {"molblock": Chem.MolToMolBlock(mol)} '''
+    if pfas_matches:
+        is_pfas = "is"
+    else:
+        is_pfas = "is not"
+
+    if not isinstance(smiles, str) or not smiles.strip():
+        raise HTTPException(400, "Missing smiles.")
+
+    verdict = "is" if is_pfas else "is not"
+
+    prompt = (f"You are a molecule with SMILE {smiles.strip()} which {is_pfas} classified as a PFAS molecule. If you are not a PFAS molecule, say \'I am not a PFAS molecule.\'" +
+              " and explain why. If you are a PFAS molecule, answer the following questions: What is the full name of the PFAS molecule? What is the chemical formula?" + 
+              "What is this PFAS molecule commonly used for? Where can it become a pollutant, Xgive specific examples? Why is this molecule dangerous to humans or the ecosystem?")
+
+    try:
+        start = time.time()
+        response = client.models.generate_content(
+            model=GEMMA_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+            system_instruction="Only write in complete sentences and limit the answer to 6 or less sentences.",
+            thinking_config=types.ThinkingConfig(thinking_level="high"),
+            )
+        )
+        end = time.time()
+        print(start - end)
+    except Exception as e:
+        raise HTTPException(502, f"Gemma request failed: {e}")
+
+    # return {"answer": response.text}
+    print(response.text)
+    return {"answer": "This is a placeholder response. The AI model integration is currently commented out."}

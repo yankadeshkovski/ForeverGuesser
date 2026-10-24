@@ -2,11 +2,12 @@
 import './page2.css'
 import { useState } from 'react'
 import MolViewer from '../molecule.jsx'
-import { getMolecule } from '../api.js'
+import { getMolecule, ask } from '../api.js'
 
 function Page2() {
   const [query, setQuery] = useState('')
   const [result, setResult] = useState(null)
+  const [answer, setAnswer] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -18,8 +19,10 @@ function Page2() {
     setLoading(true)
     setError(null)
     setResult(null)
+    setAnswer(null)
     try {
       setResult(await getMolecule(smiles))
+      setAnswer(await ask(smiles))
     } catch (err) {
       setError(err.message)   // keep the previous result visible
     } finally {
