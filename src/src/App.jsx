@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import Landing from './components/Landing'
 import Page2 from './components/Page2'
 import Page3 from './components/Page3'
+import PFAS_data from './components/PFAS_data'
 
 const routes = {
   '/': Landing,
   '/page2': Page2,
   '/page3': Page3,
+  '/PFAS_data': PFAS_data
 }
 
 export default function App() {

@@ -79,6 +79,7 @@ function Page2() {
     <main className="p2">
       <h1>Page 2</h1>
       <a href="#/">Back to landing</a>
+      <a href="#/PFAS_data">Data</a>
       <span className="info">
         i
         <span className="info-popup">
