@@ -1,0 +1,15 @@
+
+[
+  {
+    "id": "pfoa",
+    "name": "Perfluorooctanoic acid (PFOA)",
+    "aliases": ["PFOA", "C8"],
+    "smiles": "OC(=O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F"
+  },
+  {
+    "id": "pfos",
+    "name": "Perfluorooctanesulfonic acid (PFOS)",
+    "aliases": ["PFOS"],
+    "smiles": "OS(=O)(=O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F"
+  }
+]
