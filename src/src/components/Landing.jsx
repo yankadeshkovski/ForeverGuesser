@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './landing.css'
 import { ArrowUpRight, Beaker, FlaskConical, Play, ScanLine, Waves } from 'lucide-react'
+import { createHost, disposeViewer, load3Dmol, loadRDKit } from '../viewerUtils.js'
 
 function Mark() {
   return (
@@ -38,7 +39,7 @@ function MolecularViewer() {
     async function renderMolecule() {
       setReady(false)
       try {
-        const initRDKit = (await import('@rdkit/rdkit')).default
+        const initRDKit = await loadRDKit()
         const RDKit = await initRDKit({ locateFile: () => '/RDKit_minimal.wasm' })
         const molecule = RDKit.get_mol(compound.smiles)
         if (!molecule) throw new Error(`RDKit could not parse ${compound.label}`)
@@ -52,10 +53,10 @@ function MolecularViewer() {
           return `${prefix}${z.toFixed(3)}`
         })
         molecule.delete()
-        const $3Dmol = await import('3dmol')
+        const $3Dmol = await load3Dmol()
         if (cancelled || !mount.current) return
-        viewer = $3Dmol.createViewer(mount.current, { backgroundColor: '#000000', backgroundAlpha: 0, antialias: true })
-        viewer.addModel(molBlock, 'mol')
+        viewer = $3Dmol.createViewer(createHost(mount.current), { backgroundColor: '#000000', backgroundAlpha: 0, antialias: true })
+        viewer.addModel(molBlock, 'sdf')
         viewer.setStyle({}, { stick: { radius: 0.13, colorscheme: { C: '#d4ff55', F: '#ff604f', O: '#f4f4f0', S: '#ffb84d' } }, sphere: { scale: 0.25, colorscheme: { C: '#d4ff55', F: '#ff604f', O: '#f4f4f0', S: '#ffb84d' } } })
         viewer.zoomTo()
         viewer.setProjection('perspective')
@@ -68,7 +69,7 @@ function MolecularViewer() {
       }
     }
     renderMolecule()
-    return () => { cancelled = true; viewer?.clear() }
+    return () => { cancelled = true; disposeViewer(viewer) }
   }, [compound.smiles, compound.label])
 
   return <div className="molecule-stage">
