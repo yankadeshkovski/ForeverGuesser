@@ -8,7 +8,7 @@ export default function MolViewer({ molblock }) {
     if (!molblock) return;
     const viewer = $3Dmol.createViewer(ref.current, { backgroundColor: "white" });
     viewer.addModel(molblock, "mol");
-    viewer.setStyle({}, { stick: {} });
+    viewer.setStyle({}, { stick: {radius: 0.15}, sphere: { radius: 0.3 } });
     viewer.zoomTo();
     viewer.render();
     return () => viewer.clear();
