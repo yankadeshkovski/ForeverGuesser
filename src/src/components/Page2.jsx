@@ -82,7 +82,7 @@ function Page2() {
       <span className="info">
         i
         <span className="info-popup">
-          {answer ?? 'THIS IS HOW TO USE SMILE STRINGS... '}
+          {answer ?? 'SMILES writes a molecule as text: each letter is an atom (C, O, N, F), neighbors are bonded, and hydrogens are implied. = is a double bond, parentheses show a branch, and numbers close rings. For example, CCO is ethanol, OC(=O)C is acetic acid, and C(F)(F)F is a carbon with three fluorines. PFAS are usually a head group like OC(=O) followed by a chain of C(F)(F) units ending in C(F)(F)F'}
         </span>
       </span>
 
