@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import Landing from './components/Landing'
 import Page2 from './components/Page2'
+import Page3 from './components/Page3'
 
 const routes = {
   '/': Landing,
   '/page2': Page2,
+  '/page3': Page3,
 }
 
 export default function App() {
