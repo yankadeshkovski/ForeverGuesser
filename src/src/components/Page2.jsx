@@ -17,6 +17,7 @@ function Page2() {
 
     setLoading(true)
     setError(null)
+    setResult(null)
     try {
       setResult(await getMolecule(smiles))
     } catch (err) {
