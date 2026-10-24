@@ -13,7 +13,7 @@ export default function Landing() {
       </div>
       <main className="lp-main">
         <LiquidGlass mouseContainer={page} elasticity={0.25} cornerRadius={32} padding="48px 56px">
-          <h1 className="lp-title">Forever chemicals,<br />up close.</h1>
+          <h1 className="lp-title">TEST 123 Forever chemicals,<br />up close.</h1>
           <p className="lp-sub">Build PFAS molecules in 3D, then race the clock to find where they collect.</p>
           <a href="#/page2" className="lp-link">Go to page 2</a>
         </LiquidGlass>

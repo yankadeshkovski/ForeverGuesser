@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react'
-import Landing from './components/Landing'
 import Page2 from './components/Page2'
-
-const routes = {
-  '/': Landing,
-  '/page2': Page2,
-}
+import './App.css'
 
 export default function App() {
   const [path, setPath] = useState(window.location.hash.slice(1) || '/')
@@ -16,6 +11,14 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
 
-  const Page = routes[path] || Landing
-  return <Page />
+  if (path === '/page2') return <Page2 />
+
+  return (
+    <main style={{ minHeight: '100vh', display: 'grid', placeContent: 'center', gap: '1rem' }}>
+      <h1>Home</h1>
+      <button onClick={() => { window.location.hash = '/page2' }}>
+        Go to page 2
+      </button>
+    </main>
+  )
 }
