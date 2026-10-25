@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
+import { ArrowRight, Beaker, Home, Play } from "lucide-react";
 import { MAPS, POINTS_BY_MAP } from "./mapsData";
 import { getHeatmap } from "../api"; // adjust the path to wherever api.js lives
 
@@ -56,12 +57,48 @@ function applyView(map, m) {
   map.setView(m.center, m.zoom, { animate: false });
 }
 
+function distanceKm(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const fmtKm = (km) => (km < 10 ? km.toFixed(1) : Math.round(km).toLocaleString());
+const verdict = (s) => (s >= 90 ? "Bullseye" : s >= 70 ? "Sharp eye" : s >= 40 ? "Right region" : "Cold trail");
+
+// Counts a number up from 0 with an ease-out curve
+function useCountUp(target, ms = 1300) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    if (target == null) { setV(0); return; }
+    let raf;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / ms);
+      setV(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
+function Mark() {
+  return (
+    <svg className="p3-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M7 16c0-5 3.2-8 7-8 2.9 0 4.5 2 6 4.4C21.5 14.8 23 16 25 16c0 5-3.2 8-7 8-2.9 0-4.5-2-6-4.4C10.5 17.2 9 16 7 16Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="7" cy="16" r="2.4" fill="#d4ff55" /><circle cx="25" cy="16" r="2.4" fill="#ff604f" />
+    </svg>
+  );
+}
+
 export default function Page3() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const zoomRef = useRef(null);
   const poiLayerRef = useRef(null); // red points with their name tags
-  const guessLayerRef = useRef(null); // the blue guess dot
+  const guessLayerRef = useRef(null); // the guess dot
   const peakLayerRef = useRef(null); // the X marking where the 100 is
   const reqRef = useRef(0); // lets us ignore API replies that arrive after the user moved on
   const [ready, setReady] = useState(false); // true once the Leaflet map exists
@@ -76,6 +113,10 @@ export default function Page3() {
 
   const current = MAPS[index];
   const submitted = !!guess?.submitted;
+  const [scores, setScores] = useState({}); // { [mapId]: { score, km } } for the whole round
+  const shown = useCountUp(guess?.score ?? null);
+  const total = Object.values(scores).reduce((n, r) => n + r.score, 0);
+  const result = scores[current.id];
 
   // Forget the guess, the heatmap and any request still in flight
   const resetGuess = () => {
@@ -147,9 +188,9 @@ export default function Page3() {
     pts.forEach((p) => {
       const dot = L.circleMarker([p.lat, p.lng], {
         radius: locked ? 7 : 6,
-        color: "#ffffff",
+        color: "#090a09",
         weight: 2,
-        fillColor: "#d93025",
+        fillColor: "#ff604f",
         fillOpacity: 1,
         interactive: !locked, // locked: clicks pass through so you can guess on top of a point
       });
@@ -161,13 +202,13 @@ export default function Page3() {
           className: "page3-poi-tag",
         });
       } else {
-        dot.bindTooltip(p.type, { direction: "top", offset: [0, -6] });
+        dot.bindTooltip(p.type, { direction: "top", offset: [0, -6], className: "page3-poi-tag" });
       }
       dot.addTo(poiLayerRef.current);
     });
   }, [ready, index, locked]);
 
-  // Click the map to place or move the blue guess dot (only while locked and not submitted)
+  // Click the map to place or move the guess dot (only while locked and not submitted)
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map || submitted || !locked) return;
@@ -181,7 +222,7 @@ export default function Page3() {
     return () => map.off("click", onClick);
   }, [ready, index, submitted, locked]);
 
-  // Draw the blue guess dot; draggable until submitted
+  // Draw the guess dot; draggable until submitted
   useEffect(() => {
     if (!ready || !guessLayerRef.current) return;
     guessLayerRef.current.clearLayers();
@@ -230,10 +271,11 @@ export default function Page3() {
 
     const overlay = L.imageOverlay(canvas.toDataURL(), heat.bounds, {
       pane: "heatPane",
-      opacity: HEAT_OPACITY,
+      opacity: 0, // fades up to HEAT_OPACITY (see the transition in page3.css)
       interactive: false,
     }).addTo(map);
-    return () => overlay.remove();
+    const timer = setTimeout(() => overlay.setOpacity(HEAT_OPACITY), 60);
+    return () => { clearTimeout(timer); overlay.remove(); };
   }, [ready, heat, locked]);
 
   // Mark where the 100 is with an X, as soon as the heatmap arrives
@@ -242,18 +284,26 @@ export default function Page3() {
     peakLayerRef.current.clearLayers();
     if (!heat || !heat.peak || !locked) return;
 
+    // Dashed line from the guess to the answer
+    if (heat.guess) {
+      L.polyline([[heat.guess.lat, heat.guess.lng], [heat.peak.lat, heat.peak.lng]], {
+        className: "page3-link",
+        interactive: false,
+      }).addTo(peakLayerRef.current);
+    }
+
     L.marker([heat.peak.lat, heat.peak.lng], {
       keyboard: false,
       interactive: false,
       zIndexOffset: 1000,
       icon: L.divIcon({
         className: "page3-peak",
-        html: "✕",
+        html: '<span class="page3-peak-ring"></span><span class="page3-peak-ring r2"></span>✕',
         iconSize: [28, 28],
         iconAnchor: [14, 14],
       }),
     })
-      .bindTooltip("Highest PFAS Concentration", {
+      .bindTooltip("Highest PFAS concentration", {
         permanent: true,
         direction: "top",
         offset: [0, -12],
@@ -321,12 +371,15 @@ export default function Page3() {
         cols: res.cols,
         values: res.values,
         peak: res.peak,
+        guess: { lat: guess.lat, lng: guess.lng },
         bounds: [
           [bounds.south, bounds.west],
           [bounds.north, bounds.east],
         ],
       });
       setGuess((prev) => (prev ? { ...prev, score: res.score } : prev));
+      const km = res.peak ? distanceKm(guess, res.peak) : null;
+      setScores((prev) => ({ ...prev, [current.id]: { score: res.score, km } }));
       setLoading(false);
     } catch (err) {
       if (id !== reqRef.current) return;
@@ -336,70 +389,102 @@ export default function Page3() {
     }
   };
 
+  // One line telling the player what to do next
+  let status = "Click the map to drop your pin where you think PFAS is highest";
+  if (!locked) status = "Freeroam: pan and zoom to see every site. Hover a point for its name";
+  else if (error) status = error;
+  else if (loading) status = "Building the heat map";
+  else if (submitted) status = "Guess submitted. The X marks the highest concentration";
+  else if (guess) status = "Drag the pin to adjust, then submit your guess";
+
   return (
-    <div className="page3">
-      <div ref={containerRef} className="page3-map" />
+    <main className="p3">
+      <header className="p3-topbar">
+        <a className="p3-wordmark" href="#/"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
 
-      {locked && (
-        <div className="page3-score" aria-live="polite">
-          <div className="page3-score-row">
-            <span>Score</span>
-            <strong>{submitted ? (guess.score ?? "…") : "–"}</strong>
-          </div>
-          {heat && (
-            <div className="page3-scale-wrap">
-              <div className="page3-scale" style={{ background: LEGEND_GRADIENT }} />
-              <div className="page3-scale-ends">
-                <span>0</span>
-                <span>100</span>
-              </div>
-              <div className="page3-scale-caption">Scaled PFAS Concentration</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="page3-topright">
-        <div className="page3-cycle">
-          <button type="button" onClick={() => go(-1)} aria-label="Previous map">
-            ‹
-          </button>
-          <span className="page3-label">
-            Map {current.id} of {MAPS.length}
-          </span>
-          <button type="button" onClick={() => go(1)} aria-label="Next map">
-            ›
-          </button>
+        <div className="p3-cycle">
+          <button type="button" onClick={() => go(-1)} aria-label="Previous map">‹</button>
+          <span className="p3-label" aria-live="polite">Map {current.id} of {MAPS.length}</span>
+          <button type="button" onClick={() => go(1)} aria-label="Next map">›</button>
         </div>
 
         <button
           type="button"
-          className={`page3-lock${locked ? "" : " is-freeroam"}`}
+          className={`p3-btn p3-btn-ghost${locked ? "" : " is-freeroam"}`}
           onClick={handleModeClick}
+          aria-pressed={!locked}
         >
-          {locked ? "FREEROAM" : "Lock"}
+          {locked ? "Freeroam" : "Back to round"}
         </button>
 
         <button
           type="button"
-          className="page3-submit"
+          className="p3-btn p3-btn-lime"
           onClick={handleSubmit}
           disabled={!locked || !guess || submitted || loading}
         >
-          {loading ? "BUILDING HEATMAP…" : submitted ? "GUESS SUBMITTED" : "SUBMIT GUESS"}
+          {loading ? "Building heat map…" : submitted ? "Guess submitted" : "Submit guess"}
         </button>
+      </header>
 
-        {error && (
-          <div className="page3-error" role="alert">
-            {error}
+      <section className="p3-stage">
+        <div ref={containerRef} className="p3-map" />
+        {loading && <div className="p3-scanline" />}
+
+        {locked && (
+          <div className={`p3-panel p3-score${heat ? " is-scored" : ""}`} aria-live="polite">
+            <div className="p3-score-row">
+              <span className="p3-eyebrow">Score</span>
+              <strong>{submitted ? (guess.score != null ? shown : "…") : "–"}</strong>
+            </div>
+            {heat && result && (
+              <div className="p3-result">
+                <h3>{verdict(result.score)}</h3>
+                {result.km != null && <p>{fmtKm(result.km)} km from the hotspot</p>}
+                <div className="p3-scale-wrap">
+                  <div className="p3-scale" style={{ background: LEGEND_GRADIENT }} />
+                  <div className="p3-scale-ends"><span>0</span><span>100</span></div>
+                  <div className="p3-scale-caption">Scaled PFAS concentration</div>
+                </div>
+                <button type="button" className="p3-btn p3-btn-lime" onClick={() => go(1)}>
+                  Next map <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
+            {total > 0 && (
+              <div className="p3-total">
+                <span>Round total</span>
+                <span>{total}<small> / {MAPS.length * 100}</small></span>
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      <nav className="page3-nav" aria-label="Main">
-        <a href="#/">Landing</a>
-        <a href="#/page2">Page 2</a>
+        <div className="p3-panel p3-progress" role="group" aria-label="Maps in this round">
+          {MAPS.map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`p3-tick${i === index ? " is-current" : ""}${scores[m.id] ? " is-done" : ""}`}
+              onClick={() => go(i - index)}
+              aria-label={`Map ${m.id}${scores[m.id] ? `, scored ${scores[m.id].score}` : ""}`}
+              aria-current={i === index ? "true" : undefined}
+              title={scores[m.id] ? `Map ${m.id}: ${scores[m.id].score}` : `Map ${m.id}`}
+            />
+          ))}
+        </div>
+
+        <div className={`p3-panel p3-status${error ? " is-error" : ""}`} role={error ? "alert" : "status"}>
+          <span className="p3-live" />
+          <span>{status}</span>
+        </div>
+      </section>
+
+      <nav className="p3-dock" aria-label="Main">
+        <a href="#/"><Home size={14} /> Home</a>
+        <a href="#/page2"><Beaker size={14} /> Talk with Atom</a>
+        <a href="#/page3" aria-current="page"><Play size={13} fill="currentColor" /> Play Guesser</a>
       </nav>
-    </div>
+    </main>
   );
 }
