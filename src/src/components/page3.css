@@ -13,7 +13,11 @@
   width: 100%;
 }
 
-/* Lock button, top right. z-index sits above Leaflet's panes and controls (up to 1000) */
+.page3-map.leaflet-container {
+  cursor: crosshair;
+}
+
+/* Lock button, top right */
 .page3-lock {
   position: absolute;
   top: 12px;
@@ -90,7 +94,7 @@
   outline-offset: 2px;
 }
 
-/* Results panel, top left (the +/- zoom buttons are hidden while locked) */
+/* Clicked points panel, top left. z-index sits above Leaflet's panes and controls (up to 1000) */
 .page3-panel {
   position: absolute;
   top: 12px;
@@ -107,87 +111,61 @@
   border-radius: 6px;
 }
 
+.page3-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .page3-panel h2 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 16px;
 }
 
-.page3-panel h3 {
-  margin: 14px 0 6px;
-  font-size: 14px;
+.page3-clear {
+  padding: 6px 12px;
+  font: 600 13px/1 system-ui, sans-serif;
+  color: #ffffff;
+  background: #b3261e;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.page3-panel p {
-  margin: 6px 0;
+.page3-clear:hover:not(:disabled) {
+  background: #8c1d18;
 }
 
-.page3-panel ul {
-  margin: 4px 0 8px;
+.page3-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.page3-clear:focus-visible {
+  outline: 3px solid #1d6fe0;
+  outline-offset: 2px;
+}
+
+.page3-empty {
+  margin: 10px 0 0;
+  color: #5f6368;
+}
+
+.page3-points {
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
 
-.page3-panel summary {
+.page3-points li {
   display: flex;
-  justify-content: space-between;
   gap: 8px;
-  padding: 4px 0;
-  cursor: pointer;
-  text-transform: capitalize;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.page3-panel li button {
-  width: 100%;
-  padding: 4px 6px;
-  font: inherit;
-  text-align: left;
-  color: #1d6fe0;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.page3-panel li button:hover {
-  background: #eef4fd;
-}
-
-.page3-buildings li {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 0;
-  text-transform: capitalize;
-}
-
-.page3-count {
+.page3-num {
+  min-width: 24px;
   color: #5f6368;
-  white-space: nowrap;
-}
-
-.page3-panel-error {
-  color: #b3261e;
-}
-
-/* Map pins */
-.poi-pin span {
-  display: block;
-  width: 24px;
-  height: 24px;
-  background: #d93025;
-  border: 2px solid #ffffff;
-  border-radius: 50% 50% 50% 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  transform: rotate(-45deg);
-}
-
-.poi-pin span::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 8px;
-  height: 8px;
-  background: #ffffff;
-  border-radius: 50%;
 }
