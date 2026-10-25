@@ -16,6 +16,9 @@ GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 app = FastAPI()
 
+from heatmap import router as heatmap_router
+app.include_router(heatmap_router)
+
 # Allow your React dev server to call this API
 app.add_middleware(
     CORSMiddleware,
