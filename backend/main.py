@@ -14,7 +14,7 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 
-app = FastAPI()
+app = FastAPI(dependencies=[Depends(verify_api_key)])
 
 from heatmap import router as heatmap_router
 app.include_router(heatmap_router)
