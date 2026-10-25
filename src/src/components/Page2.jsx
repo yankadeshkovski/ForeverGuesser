@@ -3,7 +3,7 @@
 // and picking a preset now runs the search straight away.
 import './page2.css'
 import { Component, useState, useRef, useEffect } from 'react'
-import { ArrowUpRight, Beaker, ChevronDown, Database, Info, Play, Search } from 'lucide-react'
+import { ArrowUpRight, Beaker, ChevronDown, Database, Info, Play, Search, Send } from 'lucide-react'
 import MolViewer from '../molecule.jsx'
 import { getMolecule, ask } from '../api.js'
 
@@ -98,9 +98,16 @@ function Page2() {
   const [answerError, setAnswerError] = useState(null)
   const [openPanel, setOpenPanel] = useState(null) // 'info' | 'presets' | null
   const [preview, setPreview] = useState(null)
+ 
+  // ── Conversation state ──
+  const [history, setHistory] = useState([])               // turns after the intro: [{role, text}]
+  const [activeSmiles, setActiveSmiles] = useState(null)  // the SMILES Atom is actually talking as
+  const [followUp, setFollowUp] = useState('')
+  const [lastQuestion, setLastQuestion] = useState(null)
+ 
   const barRef = useRef(null)
   const requestId = useRef(0)
-
+ 
   useEffect(() => {
     if (!openPanel) return
     const onClick = (e) => {
@@ -114,16 +121,16 @@ function Page2() {
       document.removeEventListener('keydown', onKey)
     }
   }, [openPanel])
-
+ 
   function togglePanel(name) {
     setPreview(null)
     setOpenPanel((cur) => (cur === name ? null : name))
   }
-
+ 
   async function runSearch(raw, name = null) {
     const smiles = raw.trim()
     if (!smiles) return
-
+ 
     const id = ++requestId.current
     setLoading(true)
     setError(null)
@@ -132,7 +139,12 @@ function Page2() {
     setAnswer(null)
     setAnswerError(null)
     setAnswerLoading(false)
-
+    // A new molecule starts a fresh conversation
+    setHistory([])
+    setFollowUp('')
+    setLastQuestion(null)
+    setActiveSmiles(smiles)
+ 
     // 1. Molecule data and 3D viewer
     try {
       const mol = await getMolecule(smiles)
@@ -146,33 +158,60 @@ function Page2() {
       }
       return
     }
-
-    // 2. AI / preset explanation
+ 
+    // 2. Atom's introduction
     setAnswerLoading(true)
     try {
       const res = await ask(smiles)
       if (id !== requestId.current) return
-      setAnswer(typeof res === 'string' ? res : res.answer)
+      const text = typeof res === 'string' ? res : res.answer
+      setAnswer(text)
+      setHistory([{ role: 'model', text }]) // the intro is the first turn of history
     } catch (err) {
       if (id === requestId.current) setAnswerError(err.message)
     } finally {
       if (id === requestId.current) setAnswerLoading(false)
     }
   }
-
+ 
+  async function sendFollowUp(e) {
+    e.preventDefault()
+    const message = followUp.trim()
+    if (!message || !result || !activeSmiles || answerLoading) return
+ 
+    const id = requestId.current // not incremented: a new search still invalidates this request
+    setFollowUp('')
+    setLastQuestion(message)
+    setAnswerError(null)
+    setAnswerLoading(true)
+ 
+    try {
+      const res = await ask(activeSmiles, message, history)
+      if (id !== requestId.current) return
+      const text = typeof res === 'string' ? res : res.answer
+      setAnswer(text)
+      setHistory((h) => [...h, { role: 'user', text: message }, { role: 'model', text }])
+    } catch (err) {
+      // history is untouched on failure, so the user can simply resend
+      if (id === requestId.current) setAnswerError(err.message)
+    } finally {
+      if (id === requestId.current) setAnswerLoading(false)
+    }
+  }
+ 
   function handleSubmit(e) {
     e.preventDefault()
     setOpenPanel(null)
     runSearch(query)
   }
-
+ 
   function pickPreset(p) {
     setQuery(p.smiles)
     setOpenPanel(null)
     setPreview(null)
     runSearch(p.smiles, p.name)
   }
-
+ 
   // What Atom says in the speech bubble
   let bubbleState = 'idle'
   let bubbleBody = IDLE_LINE
@@ -192,7 +231,7 @@ function Page2() {
     bubbleState = 'answer'
     bubbleBody = answer
   }
-
+ 
   return (
     <main className="p2">
       {/* ── Top bar ─────────────────────────────── */}
@@ -214,7 +253,7 @@ function Page2() {
             </div>
           )}
         </div>
-
+ 
         <form onSubmit={handleSubmit} className="p2-controls">
           <input
             type="text"
@@ -225,7 +264,7 @@ function Page2() {
             autoComplete="off"
             aria-label="SMILES string"
           />
-
+ 
           <button
             type="button"
             className="p2-ghost-btn"
@@ -235,11 +274,11 @@ function Page2() {
           >
             Presets <ChevronDown size={14} className={openPanel === 'presets' ? 'is-flipped' : ''} />
           </button>
-
+ 
           <button type="submit" className="p2-lime-btn" disabled={loading || !query.trim()}>
             <Search size={15} /> {loading ? 'Searching…' : 'Search'}
           </button>
-
+ 
           {openPanel === 'presets' && (
             <div className="p2-presets-pop">
               <div className="p2-pop p2-preset-list">
@@ -274,7 +313,7 @@ function Page2() {
             </div>
           )}
         </form>
-
+ 
         <a
           className="p2-data-btn"
           href="#/PFAS_data"
@@ -285,17 +324,17 @@ function Page2() {
           <Database size={15} /> PFAS database <ArrowUpRight size={13} />
         </a>
       </header>
-
+ 
       {/* ── Stage: model + Atom's speech bubble ── */}
       <section className="p2-stage">
         <div className="p2-grid" />
-
+ 
         <div className="p2-model">
           {/* One viewer stays mounted; the empty state is just an overlay on top of it */}
           <ViewerBoundary>
             <MolViewer molblock={result?.molblock ?? null} />
           </ViewerBoundary>
-
+ 
           {!result && (
             <div className="p2-empty">
               <GhostChain />
@@ -303,9 +342,9 @@ function Page2() {
               <span>PICK A PRESET OR PASTE A SMILES STRING</span>
             </div>
           )}
-
+ 
           {loading && <div className="p2-scanline" aria-hidden="true" />}
-
+ 
           {result && (
             <div className="p2-readout">
               <span className="p2-eyebrow">{resultName ?? 'Specimen'}</span>
@@ -322,10 +361,10 @@ function Page2() {
               <p className="p2-smiles" title={result.canonical_smiles}>{result.canonical_smiles}</p>
             </div>
           )}
-
+ 
           {result && <span className="p2-hint">DRAG TO ROTATE · SCROLL TO ZOOM</span>}
         </div>
-
+ 
         <div className="p2-bubble-wrap">
           <div
             className={`p2-bubble is-${bubbleState}`}
@@ -335,9 +374,36 @@ function Page2() {
             <div className="p2-bubble-head"><span className="p2-live" /> ATOM</div>
             <p>{bubbleBody}</p>
           </div>
+ 
+          {lastQuestion && !answerLoading && (
+            <p className="p2-asked">You asked: {lastQuestion}</p>
+          )}
+ 
+          {result && (
+            <form className="p2-chat" onSubmit={sendFollowUp}>
+              <input
+                type="text"
+                value={followUp}
+                onChange={(e) => setFollowUp(e.target.value)}
+                placeholder="Ask Atom a question…"
+                maxLength={500}
+                disabled={loading || answerLoading}
+                spellCheck
+                autoComplete="off"
+                aria-label="Ask Atom a follow-up question"
+              />
+              <button
+                type="submit"
+                className="p2-lime-btn"
+                disabled={loading || answerLoading || !followUp.trim()}
+              >
+                <Send size={15} /> Ask
+              </button>
+            </form>
+          )}
         </div>
       </section>
-
+ 
       {/* ── Bottom navbar ───────────────────────── */}
       <nav className="p2-dock" aria-label="Primary">
         <a href="#/"><Mark /> Home</a>
@@ -347,5 +413,5 @@ function Page2() {
     </main>
   )
 }
-
+ 
 export default Page2
