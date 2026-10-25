@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './landing.css'
-import { ArrowUpRight, Beaker, Droplets, FlaskConical, Hexagon, Link2, Play, ScanLine, ShieldCheck, Waves } from 'lucide-react'
+import { ArrowUpRight, Beaker, Droplets, Flame, FlaskConical, Hexagon, Home, Link2, Play, ScanLine, ShieldCheck, Utensils, Waves } from 'lucide-react'
 import { createHost, disposeViewer, load3Dmol, loadRDKit } from '../viewerUtils.js'
 
 function Mark() {
@@ -88,10 +88,16 @@ const basics = [
   ['04', Droplets, 'One end repels, one end attracts.', 'Many PFAS have a fluorinated tail that repels water and oil, and a head drawn to water. That split makes them excellent at repelling and spreading.', 'dark'],
 ]
 
+const problems = [
+  ['01', Utensils, 'On your plate.', 'Wrappers and takeout boxes use PFAS to keep grease from soaking through. It touches your food.', 'dark'],
+  ['02', Flame, 'On the fireground.', 'Firefighting foam uses PFAS to smother fuel fires fast. It runs off into the soil and the water.', 'warm'],
+  ['03', Home, 'In your home.', 'Nonstick pans, rain jackets, and stain-proof carpet all use PFAS to repel water and dirt. You live with them every day.', 'lime'],
+]
+
 const facts = [
-  ['01', Waves, 'It travels through water.', 'Due to their nature, PFAS move easily through soil into groundwater, wells, rivers, and drinking water. Once they\’re in, they go the distance.'],
-  ['02', ScanLine, 'Small exposures add up.', 'Your body can build up PFAS over time, even from low-level exposure. Some PFAS have been linked to effects on the immune system, cholesterol, and child development.'],
-  ['03', FlaskConical, 'The chemistry lasts.', 'The carbon-fluorine bond is so strong that many PFAS last for years in the environment. One release can become a long-term problem.'],
+  ['01', Waves, 'It travels through water.', 'PFAS can move through soil into groundwater, wells, rivers, and drinking-water supplies.'],
+  ['02', ScanLine, 'Cumulative exposure matters.', 'Repeated, low-level contact can contribute to a body burden over time; some PFAS have been associated with immune, cholesterol, and developmental effects.'],
+  ['03', FlaskConical, 'The chemistry lasts.', 'Many PFAS resist environmental breakdown and can remain present for years, turning a single release into a long-term exposure concern.'],
 ]
 
 export default function Landing() {
@@ -130,6 +136,25 @@ export default function Landing() {
         </div>
         <div className="what-grid">
           {basics.map(([number, Icon, title, copy, tone]) => (
+            <article className={`hex tone-${tone}`} key={number}>
+              <div className="hex-inner">
+                <div className="hex-meta"><span>{number}</span><Icon size={16} /></div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="bento problem wrap" id="problem">
+        <div className="section-heading">
+          <span className="eyebrow">Where you meet it</span>
+          <h2>Solved a problem.<br /><span>Created another.</span></h2>
+          <p className="what-intro">The same chemistry that made them useful is why they are now in our food, our soil, and our homes.</p>
+        </div>
+        <div className="what-grid problem-grid">
+          {problems.map(([number, Icon, title, copy, tone]) => (
             <article className={`hex tone-${tone}`} key={number}>
               <div className="hex-inner">
                 <div className="hex-meta"><span>{number}</span><Icon size={16} /></div>

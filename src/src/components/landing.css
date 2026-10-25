@@ -164,3 +164,30 @@ a { color:inherit; text-decoration:none; }
   .what-grid .hex h3 { font-size: 18px; }
   .what-grid .hex p  { font-size: 12px; }
 }
+
+/* ---------- Solved a problem, created another: 3-hexagon honeycomb ---------- */
+.bento.problem { padding-block: 72px 0; }
+
+/*
+  Three interlocked flat-top hexagons: w + 2 * 0.75w = 2.5w, so each is 40% of this grid.
+  The grid is 76.923% of the page width (2.5 / 3.25), so every hexagon is exactly the same
+  size as the ones in "What is it", and the row is centered with nothing hanging off.
+*/
+@media (min-width: 761px) {
+  .what-grid.problem-grid {
+    width: 76.923%;
+    margin-inline: auto;
+    aspect-ratio: 2.5 / 1.299;
+  }
+  .what-grid.problem-grid .hex { width: 40%; height: 66.667%; }
+  .what-grid.problem-grid .hex:nth-child(1) { left: 0;   top: 0; }
+  .what-grid.problem-grid .hex:nth-child(2) { left: 30%; top: 33.333%; }
+  .what-grid.problem-grid .hex:nth-child(3) { left: 60%; top: 0; }
+  .what-grid.problem-grid .hex h3 { font-size: clamp(15px, 2.275cqw, 22px); }
+  .what-grid.problem-grid .hex p  { font-size: clamp(10.5px, 1.275cqw, 13px); }
+}
+
+/* Tablet: let the row use the full width so the text keeps room */
+@media (min-width: 761px) and (max-width: 1000px) {
+  .what-grid.problem-grid { width: 100%; }
+}
