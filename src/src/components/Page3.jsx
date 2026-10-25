@@ -3,10 +3,22 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
 
-const DEFAULT_CENTER = [40.7128, -74.006]; // [lat, lng]
-const DEFAULT_ZOOM = 17;
-const LOCK_MIN_ZOOM = 17; // must be zoomed in at least this far to lock
-const MIN_ZOOM = 3; // max zoom out: lower = see more of the world (0 = whole world)
+// ======================= EDIT THESE =======================
+const LOCKED = true; // starting state: true = frozen on the fragment below (the Lock button can toggle it)
+const START_MODE = "fitBounds"; // "fitBounds" or "setView"
+
+// Used when START_MODE is "fitBounds": [[south, west], [north, east]
+// const VIEW_BOUNDS = [[40.7118, -74.0075],[40.7138, -74.0045],];
+const VIEW_BOUNDS = [[40.763381, -73.921509], [40.851605, -73.657837],];
+
+// Used when START_MODE is "setView"
+const VIEW_CENTER = [40.807493, -73.789673]; // [lat, lng]
+const VIEW_ZOOM = 13;
+
+const LOCK_MIN_ZOOM = 17; // when you press Lock yourself, you must be zoomed in at least this far
+// ==========================================================
+
+const MIN_ZOOM = 3;
 const WORLD_BOUNDS = [
   [-85, -180],
   [85, 180],
@@ -22,111 +34,28 @@ const HANDLERS = [
   "keyboard",
 ];
 
-// ---- POI / building lookup (OpenStreetMap data via the Overpass API) ----
-const OVERPASS_URLS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-];
-const POI_KEYS = ["amenity", "shop", "tourism", "leisure", "office"];
-const MAX_PINS = 500;
+const fmt = (n) => n.toFixed(6); // about 0.1 m of precision
 
-const EMPTY_POIS = { status: "idle", pois: [], total: 0, buildings: [], error: "" };
-
-const pretty = (s) => s.replace(/_/g, " ");
-
-function buildQuery(b) {
-  const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
-  const poiParts = POI_KEYS.map((k) => `nwr["${k}"](${bbox});`).join("");
-  return `[out:json][timeout:25];(${poiParts}nwr["building"](${bbox}););out center tags;`;
-}
-
-async function fetchOverpass(query, signal) {
-  let lastError;
-  for (const url of OVERPASS_URLS) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "data=" + encodeURIComponent(query),
-        signal,
-      });
-      if (!res.ok) throw new Error(`Overpass returned ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      if (err.name === "AbortError") throw err;
-      lastError = err; // try the next server
-    }
+// Put the map on the chosen fragment (no animation, so the lock can't catch it mid-move)
+function applyView(map) {
+  if (START_MODE === "setView") {
+    map.setView(VIEW_CENTER, VIEW_ZOOM, { animate: false });
+  } else {
+    map.fitBounds(VIEW_BOUNDS, { animate: false });
   }
-  throw lastError;
 }
-
-// Split raw OSM elements into POIs (for pins) and building-type counts,
-// keeping only things whose point lies inside the locked view.
-function parseElements(elements, bounds) {
-  const pois = [];
-  const counts = {};
-  for (const el of elements) {
-    const tags = el.tags || {};
-    const lat = el.lat ?? el.center?.lat;
-    const lon = el.lon ?? el.center?.lon;
-    if (lat == null || lon == null || !bounds.contains([lat, lon])) continue;
-
-    if (tags.building) counts[tags.building] = (counts[tags.building] || 0) + 1;
-
-    const key = POI_KEYS.find((k) => tags[k]);
-    if (key) {
-      pois.push({
-        id: `${el.type}/${el.id}`,
-        lat,
-        lon,
-        name: tags.name || "",
-        key,
-        type: tags[key],
-      });
-    }
-  }
-  const buildings = Object.entries(counts)
-    .map(([type, count]) => ({ type, count }))
-    .sort((a, b) => b.count - a.count);
-  return { pois, buildings };
-}
-
-function groupPois(pois) {
-  const groups = {};
-  for (const p of pois) {
-    const id = `${p.key}:${p.type}`;
-    (groups[id] ||= { id, label: pretty(p.type), items: [] }).items.push(p);
-  }
-  return Object.values(groups).sort((a, b) => b.items.length - a.items.length);
-}
-
-// Built with DOM nodes (not HTML strings) so OSM names can never inject markup
-function makePopup(p) {
-  const div = document.createElement("div");
-  const title = document.createElement("strong");
-  title.textContent = p.name || `Unnamed ${pretty(p.type)}`;
-  div.appendChild(title);
-  div.appendChild(document.createElement("br"));
-  div.appendChild(document.createTextNode(`${p.key}: ${pretty(p.type)}`));
-  return div;
-}
-
-const pinIcon = L.divIcon({
-  className: "poi-pin",
-  html: "<span></span>",
-  iconSize: [24, 24],
-  iconAnchor: [12, 29],
-  popupAnchor: [0, -29],
-});
 
 export default function Page3() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef({});
+  const zoomRef = useRef(null); // the +/- buttons, so they can be hidden while locked
+  const layerRef = useRef(null); // holds the dots drawn for clicked points
+  const counterRef = useRef(0); // numbers the clicked points
   const noticeTimer = useRef(null);
-  const [locked, setLocked] = useState(false);
+  const lockedRef = useRef(LOCKED); // lets the startup timer know if the map is still locked
+  const [locked, setLocked] = useState(LOCKED);
   const [notice, setNotice] = useState("");
-  const [poi, setPoi] = useState(EMPTY_POIS);
+  const [points, setPoints] = useState([]);
 
   // Create the map once
   useEffect(() => {
@@ -136,30 +65,65 @@ export default function Page3() {
     const map = L.map(containerRef.current, {
       minZoom: MIN_ZOOM,
       maxBounds: WORLD_BOUNDS,
-      maxBoundsViscosity: 1.0, // stops dragging past the edge of the world
-    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      maxBoundsViscosity: 1.0,
+      zoomControl: false, // added below at the bottom right, away from the points panel
+    });
+
+    applyView(map);
 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       minZoom: MIN_ZOOM,
       maxZoom: 19,
-      noWrap: true, // no repeating copies of the world
+      noWrap: true,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
+    zoomRef.current = L.control.zoom({ position: "bottomright" }).addTo(map);
+    layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    // Make sure tiles render correctly once the layout has settled
-    const timer = setTimeout(() => map.invalidateSize(), 100);
+    // Record every click as a numbered point
+    map.on("click", (e) => {
+      const n = ++counterRef.current;
+      const { lat, lng } = e.latlng;
+
+      L.circleMarker([lat, lng], {
+        radius: 6,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: "#d93025",
+        fillOpacity: 1,
+        interactive: false, // clicks pass through to the map
+      })
+        .bindTooltip(String(n), { permanent: true, direction: "top", offset: [0, -6] })
+        .addTo(layerRef.current);
+
+      setPoints((prev) => [...prev, { id: n, lat, lng }]);
+    });
+
+    // Once the layout has settled, re-measure and re-apply the same fragment
+    const timer = setTimeout(() => {
+      map.invalidateSize({ animate: false });
+      if (mapRef.current && lockedRef.current) applyView(map);
+    }, 100);
 
     return () => {
       clearTimeout(timer);
       map.remove();
       mapRef.current = null;
+      zoomRef.current = null;
+      layerRef.current = null;
+      counterRef.current = 0;
     };
   }, []);
 
-  // Lock / unlock zoom and movement whenever the button is toggled
+  // Keep the startup timer's view of "locked" up to date
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
+
+  // Lock / unlock zoom and movement (also runs once at startup to apply LOCKED)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -169,58 +133,19 @@ export default function Page3() {
     });
 
     // Hide the +/- buttons while locked so zoom can't be changed that way either
-    if (map.zoomControl) {
-      map.zoomControl.getContainer().style.display = locked ? "none" : "";
+    if (zoomRef.current) {
+      zoomRef.current.getContainer().style.display = locked ? "none" : "";
     }
-  }, [locked]);
-
-  // When locked: fetch POIs + buildings inside the visible borders and pin them.
-  // When unlocked (or unmounted): cancel the request and remove the pins.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!locked || !map) return;
-
-    const controller = new AbortController();
-    const layer = L.layerGroup().addTo(map);
-    const bounds = map.getBounds(); // the frozen fragment
-
-    setPoi({ ...EMPTY_POIS, status: "loading" });
-
-    fetchOverpass(buildQuery(bounds), controller.signal)
-      .then((data) => {
-        const { pois, buildings } = parseElements(data.elements || [], bounds);
-        const shown = pois.slice(0, MAX_PINS);
-        shown.forEach((p) => {
-          const marker = L.marker([p.lat, p.lon], { icon: pinIcon });
-          // autoPan off: the map is locked, so a popup must never move it
-          marker.bindPopup(makePopup(p), { autoPan: false });
-          marker.addTo(layer);
-          markersRef.current[p.id] = marker;
-        });
-        setPoi({ status: "done", pois: shown, total: pois.length, buildings, error: "" });
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        setPoi({
-          ...EMPTY_POIS,
-          status: "error",
-          error: "Couldn't load places. Check your connection, then unlock and lock again.",
-        });
-      });
-
-    return () => {
-      controller.abort();
-      layer.remove();
-      markersRef.current = {};
-      setPoi(EMPTY_POIS);
-    };
   }, [locked]);
 
   useEffect(() => () => clearTimeout(noticeTimer.current), []);
 
   const handleLockClick = () => {
     const map = mapRef.current;
-    if (!locked && map && map.getZoom() < LOCK_MIN_ZOOM) {
+    if (!map) return;
+
+    // Unlocking is always allowed; locking needs enough zoom
+    if (!locked && map.getZoom() < LOCK_MIN_ZOOM) {
       setNotice("Zoom in further before locking the map.");
       clearTimeout(noticeTimer.current);
       noticeTimer.current = setTimeout(() => setNotice(""), 3500);
@@ -230,7 +155,11 @@ export default function Page3() {
     setLocked((v) => !v);
   };
 
-  const buildingTotal = poi.buildings.reduce((sum, b) => sum + b.count, 0);
+  const handleClear = () => {
+    layerRef.current?.clearLayers();
+    counterRef.current = 0;
+    setPoints([]);
+  };
 
   return (
     <div className="page3">
@@ -251,56 +180,34 @@ export default function Page3() {
         </div>
       )}
 
-      {locked && (
-        <aside className="page3-panel" aria-label="Places in this view">
-          <h2>In this view</h2>
+      <aside className="page3-panel" aria-label="Clicked coordinates">
+        <div className="page3-panel-head">
+          <h2>Clicked points ({points.length})</h2>
+          <button
+            type="button"
+            className="page3-clear"
+            onClick={handleClear}
+            disabled={points.length === 0}
+          >
+            Clear
+          </button>
+        </div>
 
-          {poi.status === "loading" && <p>Loading places…</p>}
-          {poi.status === "error" && <p className="page3-panel-error">{poi.error}</p>}
-
-          {poi.status === "done" && (
-            <>
-              <h3>Places ({poi.total})</h3>
-              {poi.total === 0 && <p>No places are mapped in this view.</p>}
-              {poi.total > poi.pois.length && (
-                <p>Showing the first {MAX_PINS} places.</p>
-              )}
-              {groupPois(poi.pois).map((g) => (
-                <details key={g.id}>
-                  <summary>
-                    {g.label} <span className="page3-count">{g.items.length}</span>
-                  </summary>
-                  <ul>
-                    {g.items.map((p) => (
-                      <li key={p.id}>
-                        <button
-                          type="button"
-                          onClick={() => markersRef.current[p.id]?.openPopup()}
-                        >
-                          {p.name || `Unnamed ${pretty(p.type)}`}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-
-              <h3>Buildings ({buildingTotal})</h3>
-              {buildingTotal === 0 && <p>No buildings are mapped in this view.</p>}
-              <ul className="page3-buildings">
-                {poi.buildings.map((b) => (
-                  <li key={b.type}>
-                    <span>{b.type === "yes" ? "Type not specified" : pretty(b.type)}</span>
-                    <span className="page3-count">
-                      {b.count} ({Math.round((b.count / buildingTotal) * 100)}%)
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </aside>
-      )}
+        {points.length === 0 ? (
+          <p className="page3-empty">Click the map to record a point.</p>
+        ) : (
+          <ol className="page3-points">
+            {points.map((p) => (
+              <li key={p.id}>
+                <span className="page3-num">{p.id}.</span>
+                <span>
+                  {fmt(p.lat)}, {fmt(p.lng)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </aside>
 
       <nav className="page3-nav" aria-label="Main">
         <a href="#/">Landing</a>
