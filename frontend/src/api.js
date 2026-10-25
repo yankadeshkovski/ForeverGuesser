@@ -1,5 +1,5 @@
-const BASE = "https://foreverguesser-backend.onrender.com";
-// const BASE = import.meta.env.VITE_API_URL ?? ""
+// const BASE = "https://foreverguesser-backend.onrender.com";
+const BASE = import.meta.env.VITE_API_URL ?? ""
 
 export async function getMolecule(smiles) {
   let res;
