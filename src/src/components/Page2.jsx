@@ -127,6 +127,15 @@ function Page2() {
     setOpenPanel((cur) => (cur === name ? null : name))
   }
  
+  // The SMILES primer opens on hover/focus and closes when the pointer or focus leaves
+  function openInfo() {
+    setPreview(null)
+    setOpenPanel('info')
+  }
+  function closeInfo() {
+    setOpenPanel((cur) => (cur === 'info' ? null : cur))
+  }
+
   async function runSearch(raw, name = null) {
     const smiles = raw.trim()
     if (!smiles) return
@@ -236,13 +245,19 @@ function Page2() {
     <main className="p2">
       {/* ── Top bar ─────────────────────────────── */}
       <header className="p2-topbar" ref={barRef}>
-        <div className="p2-info">
+        <div
+          className="p2-info"
+          onMouseEnter={openInfo}
+          onMouseLeave={closeInfo}
+          onFocus={openInfo}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) closeInfo() }}
+        >
           <button
             type="button"
             className="p2-icon-btn"
             aria-label="What is a SMILES string?"
             aria-expanded={openPanel === 'info'}
-            onClick={() => togglePanel('info')}
+            onClick={openInfo} /* tap on touch screens; never toggles shut under a hovering mouse */
           >
             <Info size={17} />
           </button>
