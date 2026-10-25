@@ -1,3 +1,26 @@
+10,"Airport",1.350987,103.989201
+10,"Airbase",1.379663,103.983192
+10,"Airbase",1.339482,104.009800
+10,"Fire Station",1.370734,103.981991
+10,"Fire Station",1.352704,104.005680
+10,"Fire Station",1.369360,103.958302
+10,"Fire Station",1.337078,103.951263
+10,"Fire Station",1.331068,103.889637
+10,"Fire Station",1.387905,103.889294
+10,"Industrial Park",1.378976,103.972721
+11,"Airport",35.545030,139.775791
+11,"Fire Station",35.548244,139.786434
+11,"Fire Station"35.579821,139.740429
+11,"Fire Station"35.549921,139.730644
+11,"Fire Station"35.593929,139.734936
+12,"Landfill",5.545373,-0.224361
+12,"Garments Manufacturer",5.554177,-0.212388
+12,"Fire Station",5.549177,-0.209985
+12,"Fire Station",5.554262,-0.199041
+13,"Waste Management Service",-38.168184,144.368763
+13,"Waste Management Service",-38.171222,144.365072
+13,"Waste Management Service",-38.160284,144.346962
+13,"Industrial Park",-38.172370,144.349537
 1,"Airport",40.778830,-73.874130
 1,"Seaplane Base",40.845111,-73.816452
 1,"Seaplane Base",40.836277,-73.718262
