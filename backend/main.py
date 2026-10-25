@@ -22,7 +22,7 @@ app.include_router(heatmap_router)
 # Allow your React dev server to call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite's default; CRA uses 3000
+    allow_origins=["https://foreverguesser.onrender.com"],  # Vite's default; CRA uses 3000
     allow_methods=["*"],
     allow_headers=["*"],
 )
