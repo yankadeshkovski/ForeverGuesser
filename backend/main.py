@@ -37,7 +37,7 @@ MAX_HISTORY_TURNS = 20
 MAX_MESSAGE_CHARS = 500
 
 #@app.post("/api/molecule")
-@app.post("/molecule")
+@app.post("api/molecule")
 async def get_molecule(request: Request):
     try:
         data = await request.json()
@@ -105,7 +105,7 @@ INTRO_PROMPT = (
 )
 
 #@app.post("/api/ask")
-@app.post("/ask")
+@app.post("api/ask")
 async def ask(request: Request):
     try:
         data = await request.json()
@@ -230,7 +230,7 @@ class ZoneReply(BaseModel):
 
 
 #@app.post("/api/zone-chat")
-@app.post("/zone-chat")
+@app.post("api/zone-chat")
 async def zone_chat(request: Request):
     try:
         data = await request.json()
