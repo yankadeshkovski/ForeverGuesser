@@ -28,7 +28,7 @@
   gap: 10px;
   border-bottom: 1px solid var(--line);
 }
-.p2-icon-btn, .p2-ghost-btn, .p2-lime-btn, .p2-data-btn, .p2-controls input {
+.p2-icon-btn, .p2-ghost-btn, .p2-lime-btn, .p2-data-btn, .p2-controls input, .p2-chat input {
   height: 42px;
   border-radius: 5px;
   font-family: inherit;
@@ -134,7 +134,7 @@
 .p2-scanline { position: absolute; z-index: 2; left: 0; right: 0; height: 90px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(212, 255, 85, .13) 85%, rgba(212, 255, 85, .55)); border-bottom: 1px solid var(--lime); animation: p2-scan 1.8s cubic-bezier(.45, 0, .55, 1) infinite; }
 
 /* ── Speech bubble ─────────────────────────── */
-.p2-bubble-wrap { position: relative; z-index: 2; display: flex; justify-content: center; padding: 14px 24px 26px; }
+.p2-bubble-wrap { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 24px 26px; }
 .p2-bubble {
   position: relative; width: min(780px, 100%); padding: 18px 26px 20px;
   border: 1px solid rgba(212, 255, 85, .38); border-radius: 26px; background: #10120e;
@@ -169,10 +169,26 @@
 .p2-dock a:hover { color: var(--paper); background: rgba(255, 255, 255, .07); }
 .p2-dock a[aria-current="page"] { color: var(--ink); background: var(--lime); }
 
-/* ── Chat ───────────────────────────*/
-.p2-chat { display: flex; gap: 8px; margin-top: 10px; }
-.p2-chat input { flex: 1; min-width: 0; }
-.p2-asked { margin: 8px 4px 0; font-size: 0.8rem; opacity: 0.7; }
+/* ── Chat (follow-ups to Atom) ─────────────── */
+.p2-asked {
+  display: flex; align-items: baseline; gap: 10px; width: min(780px, 100%); padding: 0 6px;
+  color: var(--muted); font: 11px/1.6 'DM Mono', monospace; letter-spacing: .02em;
+  animation: p2-rise .5s both;
+}
+.p2-asked span { flex: none; color: var(--lime); font-size: 10px; letter-spacing: .14em; }
+.p2-chat {
+  position: relative; display: flex; gap: 8px; width: min(780px, 100%); padding: 6px;
+  border: 1px solid var(--line); border-radius: 999px; background: rgba(9, 10, 9, .6); backdrop-filter: blur(12px);
+  transition: border-color .25s, box-shadow .25s;
+}
+.p2-chat:focus-within { border-color: rgba(212, 255, 85, .5); box-shadow: 0 0 0 3px rgba(212, 255, 85, .1); }
+.p2-chat input {
+  flex: 1; min-width: 0; padding: 0 16px; outline: none; border: 0; border-radius: 999px;
+  color: var(--paper); background: transparent; font: 12px 'DM Mono', monospace;
+}
+.p2-chat input::placeholder { color: #6d6f68; }
+.p2-chat input:disabled { opacity: .5; cursor: not-allowed; }
+.p2-chat .p2-lime-btn { border-radius: 999px; padding: 0 20px; }
 
 /* ── Motion ────────────────────────────────── */
 @keyframes p2-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
@@ -193,6 +209,7 @@
   .p2-preset-preview { display: none; }
   .p2-stage { min-height: 520px; }
   .p2-bubble-wrap { padding: 10px 14px 18px; }
+  .p2-chat .p2-lime-btn { flex: none; padding: 0 16px; }
   .p2-bubble { padding: 16px 18px 18px; border-radius: 22px; }
   .p2-hint { display: none; }
   .p2-dock a { padding: 10px 12px; font-size: 11px; }

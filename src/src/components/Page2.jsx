@@ -376,7 +376,7 @@ function Page2() {
           </div>
  
           {lastQuestion && !answerLoading && (
-            <p className="p2-asked">You asked: {lastQuestion}</p>
+            <p className="p2-asked"><span>YOU</span>{lastQuestion}</p>
           )}
  
           {result && (
