@@ -5,6 +5,7 @@ import './page2.css'
 import { Component, useState, useRef, useEffect } from 'react'
 import { ArrowRight, Beaker, ChevronDown, Database, Info, Play, Search, Send } from 'lucide-react'
 import MolViewer from '../molecule.jsx'
+import ThemeToggle from './ThemeToggle'
 import { getMolecule, ask } from '../api.js'
 
 const PRESETS = [
@@ -335,6 +336,7 @@ function Page2() {
         >
           <Database size={15} /> PFAS database <ArrowRight size={13} />
         </a>
+        <ThemeToggle />
       </header>
  
       {/* ── Stage: model + Atom's speech bubble ── */}

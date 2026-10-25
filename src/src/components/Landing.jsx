@@ -3,6 +3,8 @@ import './landing.css'
 import { ArrowUpRight, Beaker, Droplets, Flame, FlaskConical, Hexagon, Home, Link2, Play, ScanLine, ShieldCheck, Utensils, Waves } from 'lucide-react'
 import { createHost, disposeViewer, load3Dmol, loadRDKit } from '../viewerUtils.js'
 import Faq from './Faq'
+import ThemeToggle from './ThemeToggle'
+import { useTheme } from '../theme'
 
 function Mark() {
   return (
@@ -28,8 +30,17 @@ const compounds = {
   },
 }
 
-function MolecularViewer() {
+const ATOM_COLORS = {
+  dark: { C: '#d4ff55', F: '#ff604f', O: '#f4f4f0', S: '#ffb84d' },
+  light: { C: '#6f9400', F: '#e5432f', O: '#23251e', S: '#d98200' },
+}
+const atomStyle = (colors) => ({ stick: { radius: 0.13, colorscheme: colors }, sphere: { scale: 0.25, colorscheme: colors } })
+
+function MolecularViewer({ theme }) {
   const mount = useRef(null)
+  const viewerRef = useRef(null)
+  const themeRef = useRef(theme)
+  themeRef.current = theme
   const [ready, setReady] = useState(false)
   const [compoundKey, setCompoundKey] = useState('pfoa')
   const compound = compounds[compoundKey]
@@ -58,7 +69,8 @@ function MolecularViewer() {
         if (cancelled || !mount.current) return
         viewer = $3Dmol.createViewer(createHost(mount.current), { backgroundColor: '#000000', backgroundAlpha: 0, antialias: true })
         viewer.addModel(molBlock, 'sdf')
-        viewer.setStyle({}, { stick: { radius: 0.13, colorscheme: { C: '#d4ff55', F: '#ff604f', O: '#f4f4f0', S: '#ffb84d' } }, sphere: { scale: 0.25, colorscheme: { C: '#d4ff55', F: '#ff604f', O: '#f4f4f0', S: '#ffb84d' } } })
+        viewer.setStyle({}, atomStyle(ATOM_COLORS[themeRef.current]))
+        viewerRef.current = viewer
         viewer.zoomTo()
         viewer.setProjection('perspective')
         viewer.rotate(18, 'y')
@@ -70,8 +82,16 @@ function MolecularViewer() {
       }
     }
     renderMolecule()
-    return () => { cancelled = true; disposeViewer(viewer) }
+    return () => { cancelled = true; viewerRef.current = null; disposeViewer(viewer) }
   }, [compound.smiles, compound.label])
+
+  // Recolor in place when the theme changes (no need to rebuild the molecule)
+  useEffect(() => {
+    const v = viewerRef.current
+    if (!v) return
+    v.setStyle({}, atomStyle(ATOM_COLORS[theme]))
+    v.render()
+  }, [theme])
 
   return <div className="molecule-stage">
     <div className="compound-switch" role="group" aria-label="Choose a PFAS compound">
@@ -103,6 +123,7 @@ const facts = [
 
 export default function Landing() {
   const [progress, setProgress] = useState(0)
+  const theme = useTheme()
   useEffect(() => {
     const onScroll = () => setProgress(Math.min(1, window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight)))
     window.addEventListener('scroll', onScroll, { passive: true }); onScroll()
@@ -114,7 +135,10 @@ export default function Landing() {
       <div className="scroll-line"><span style={{ transform: `scaleX(${progress})` }} /></div>
       <nav className="topbar">
         <a className="wordmark" href="#top"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
-        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#what">What is it</a><a href="#why">Why it matters</a><a href="#faq">FAQ</a></div>
+        <div className="nav-right">
+          <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#what">What is it</a><a href="#problem">Where you meet it</a><a href="#why">Why it matters</a><a href="#faq">FAQ</a></div>
+          <ThemeToggle />
+        </div>
       </nav>
 
       <section className="hero wrap" id="top">
@@ -124,7 +148,7 @@ export default function Landing() {
           <p className="hero-lede">Explore the chemistry behind the world&apos;s most UN-forgettable chemicals—then see where they go.</p>
           <div className="hero-actions"><a className="button button-lime" href="#/page2"><Beaker size={17} /> Talk with Atom</a><a className="button button-quiet" href="#/page3"><Play size={15} fill="currentColor" /> Play Guesser</a></div>
         </div>
-        <div className="hero-specimen"><div className="specimen-grid" /><MolecularViewer /><div className="specimen-caption"><span>PFOA + PFOS / RDKit 3D</span><span>DRAG TO ROTATE</span></div></div>
+        <div className="hero-specimen"><div className="specimen-grid" /><MolecularViewer theme={theme} /><div className="specimen-caption"><span>PFOA + PFOS / RDKit 3D</span><span>DRAG TO ROTATE</span></div></div>
       </section>
 
       <section className="signal-strip"><div className="wrap signal-inner"><strong>LEARN BY LOOKING CLOSER</strong><span>Carbon–fluorine bonds, made visible.</span></div></section>

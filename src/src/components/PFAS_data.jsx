@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Check, Search } from 'lucide-react'
 import './PFAS_data.css'
+import ThemeToggle from './ThemeToggle'
 
 // Produced by clean_pfas.py: [[cid, name, smiles], ...]. Put it in /public so it is
 // fetched on demand instead of being bundled into the page's JavaScript.
@@ -55,7 +56,10 @@ function DataPage() {
     <main className="data">
       <header className="data-top">
         <a className="data-back" href="#/page2"><ArrowLeft size={15} /> Back to Talk with Atom</a>
-        <span className="data-eyebrow">PFAS / REFERENCE SET</span>
+        <div className="data-top-right">
+          <span className="data-eyebrow">PFAS / REFERENCE SET</span>
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="data-wrap">

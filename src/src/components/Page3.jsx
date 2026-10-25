@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "./page3.css";
 import { ArrowRight, Beaker, Play, Send } from "lucide-react";
 import { MAPS, POINTS_BY_MAP } from "./mapsData";
+import ThemeToggle from "./ThemeToggle";
 import { getHeatmap, askZone } from "../api"; // adjust the path to wherever api.js lives
 
 const LOCKED = true; // starting state
@@ -671,6 +672,8 @@ export default function Page3() {
         >
           {loading ? "Building heat map…" : submitted ? "Guess submitted" : "Submit guess"}
         </button>
+
+        <ThemeToggle />
       </header>
 
       <section className="p3-stage">

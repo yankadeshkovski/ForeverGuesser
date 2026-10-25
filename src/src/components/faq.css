@@ -43,7 +43,7 @@
 }
 .qa-tab small { flex: none; font: 10px/1 'DM Mono', monospace; letter-spacing: .08em; transition: color .3s; }
 .qa-tab:hover, .qa-tab.is-active { color: var(--paper); }
-.qa-tab.is-active small { color: var(--lime); }
+.qa-tab.is-active small { color: var(--lime-text); }
 
 /* ── Questions ─────────────────────────────── */
 .qa-list { min-height: 21rem; border-top: 1px solid var(--line); }
@@ -68,8 +68,8 @@
 }
 .qa-num { color: var(--muted); font: 11px/1 'DM Mono', monospace; transition: color .35s; }
 .qa-q { font-size: clamp(1rem, 1.6vw, 1.15rem); font-weight: 600; letter-spacing: -.02em; line-height: 1.3; transition: color .35s; }
-.qa-btn:hover .qa-q, .qa-btn:hover .qa-num { color: var(--lime); }
-.qa-item.is-open .qa-num { color: var(--lime); }
+.qa-btn:hover .qa-q, .qa-btn:hover .qa-num { color: var(--lime-text); }
+.qa-item.is-open .qa-num { color: var(--lime-text); }
 
 .qa-icon {
   position: relative; width: var(--qa-icon); height: var(--qa-icon); color: var(--muted);
@@ -81,7 +81,7 @@
   background: currentColor; transition: transform .45s cubic-bezier(.22, 1, .36, 1);
 }
 .qa-icon i:last-child { transform: rotate(90deg); }
-.qa-btn:hover .qa-icon { color: var(--lime); border-color: rgba(212, 255, 85, .5); }
+.qa-btn:hover .qa-icon { color: var(--lime-text); border-color: rgba(212, 255, 85, .5); }
 .qa-item.is-open .qa-icon { transform: rotate(180deg); color: var(--ink); background: var(--lime); border-color: var(--lime); }
 .qa-item.is-open .qa-icon i:last-child { transform: rotate(0); }
 
@@ -95,7 +95,7 @@
 .qa-a-inner { min-height: 0; overflow: hidden; padding-left: var(--qa-indent); padding-right: calc(var(--qa-pad) + var(--qa-icon) + var(--qa-gap)); }
 .qa-body { display: grid; gap: 14px; max-width: 660px; padding-bottom: var(--qa-row); }
 .qa-body p {
-  color: #b8bab3; font-size: 14px; line-height: 1.75;
+  color: var(--text-2); font-size: 14px; line-height: 1.75;
   opacity: 0; transform: translateY(10px);
   transition: opacity .35s ease, transform .5s cubic-bezier(.22, 1, .36, 1);
 }
@@ -103,7 +103,7 @@
 
 /* Source links */
 .qa-link {
-  color: var(--lime); border-bottom: 1px solid rgba(212, 255, 85, .35);
+  color: var(--lime-text); border-bottom: 1px solid rgba(212, 255, 85, .35);
   transition: border-color .25s, background .25s;
 }
 .qa-link svg { display: inline-block; margin-left: 2px; vertical-align: -1px; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
@@ -111,7 +111,7 @@
 .qa-link:hover svg { transform: translate(2px, -2px); }
 .qa-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-.qa-note { margin-top: 20px; padding-left: var(--qa-pad); color: #6d6f68; font: 10px 'DM Mono', monospace; letter-spacing: .06em; }
+.qa-note { margin-top: 20px; padding-left: var(--qa-pad); color: var(--text-3); font: 10px 'DM Mono', monospace; letter-spacing: .06em; }
 
 /* New section: questions slide in once, staggered */
 .qa-list.is-switching .qa-item { animation: qa-in .6s cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }

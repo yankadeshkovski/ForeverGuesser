@@ -24,7 +24,7 @@
   border-bottom: 1px solid var(--line);
 }
 .p3-wordmark { display: flex; gap: 10px; align-items: center; margin-right: auto; font-size: 10px; line-height: 1.05; letter-spacing: .13em; font-weight: 700; }
-.p3-wordmark i { color: var(--lime); font-style: normal; }
+.p3-wordmark i { color: var(--lime-text, var(--lime)); font-style: normal; }
 
 .p3-cycle { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, .035); }
 .p3-cycle button {
@@ -32,7 +32,7 @@
   border: 0; border-radius: 999px; color: var(--muted); background: transparent; font: 18px/1 'DM Mono', monospace;
   transition: color .25s, background .25s;
 }
-.p3-cycle button:hover { color: var(--lime); background: rgba(212, 255, 85, .08); }
+.p3-cycle button:hover { color: var(--lime-text, var(--lime)); background: rgba(212, 255, 85, .08); }
 .p3-label { min-width: 104px; text-align: center; color: var(--paper); font: 11px 'DM Mono', monospace; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
 
 .p3-btn {
@@ -42,7 +42,7 @@
 }
 .p3-btn-ghost { color: var(--paper); background: transparent; border: 1px solid var(--line); }
 .p3-btn-ghost:hover { background: rgba(255, 255, 255, .08); }
-.p3-btn-ghost.is-freeroam { color: var(--lime); border-color: rgba(212, 255, 85, .5); background: rgba(212, 255, 85, .06); }
+.p3-btn-ghost.is-freeroam { color: var(--lime-text, var(--lime)); border-color: rgba(212, 255, 85, .5); background: rgba(212, 255, 85, .06); }
 .p3-btn-lime { color: var(--ink); background: var(--lime); border: 0; }
 .p3-btn-lime:hover:not(:disabled) { transform: translateY(-2px); }
 .p3-btn-lime:disabled { opacity: .4; cursor: not-allowed; }
@@ -70,7 +70,7 @@
 .p3-score { top: 16px; left: 16px; width: 208px; padding: 14px 16px 16px; display: grid; gap: 12px; }
 .p3-score-row { display: flex; align-items: baseline; justify-content: space-between; }
 .p3-score strong { font-size: 2.2rem; font-weight: 600; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
-.p3-score.is-scored strong { color: var(--lime); }
+.p3-score.is-scored strong { color: var(--lime-text, var(--lime)); }
 .p3-scale-wrap { display: grid; gap: 6px; animation: p3-rise .5s both; }
 .p3-scale { height: 10px; border: 1px solid var(--line); }
 .p3-scale-ends { display: flex; justify-content: space-between; color: var(--muted); font: 10px 'DM Mono', monospace; }
@@ -92,7 +92,7 @@
 /* Leaflet chrome */
 .p3-map .leaflet-control-zoom { border: 1px solid rgba(233, 233, 227, .18); border-radius: 5px; overflow: hidden; box-shadow: none; }
 .p3-map .leaflet-control-zoom a { color: var(--paper); background: rgba(9, 10, 9, .78); border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); }
-.p3-map .leaflet-control-zoom a:hover { color: var(--lime); background: rgba(212, 255, 85, .1); }
+.p3-map .leaflet-control-zoom a:hover { color: var(--lime-text, var(--lime)); background: rgba(212, 255, 85, .1); }
 .p3-map .leaflet-control-attribution { color: var(--muted); background: rgba(9, 10, 9, .7); font: 9px 'DM Mono', monospace; }
 .p3-map .leaflet-control-attribution a { color: var(--paper); }
 
@@ -206,7 +206,7 @@
 .p3-modal-card { width: min(560px, 100%); max-height: calc(100svh - 32px); overflow-y: auto; display: grid; gap: 14px; padding: 32px; border: 1px solid rgba(212, 255, 85, .38); background: #0e100d; box-shadow: 0 30px 90px rgba(0, 0, 0, .6); animation: p3-rise .6s cubic-bezier(.22, 1, .36, 1) both; }
 .p3-modal-card h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 600; letter-spacing: -.04em; line-height: 1.05; }
 .p3-final { display: flex; align-items: baseline; gap: 12px; margin-block: 6px; }
-.p3-final strong { color: var(--lime); font-size: clamp(3.5rem, 12vw, 5.5rem); font-weight: 600; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.p3-final strong { color: var(--lime-text, var(--lime)); font-size: clamp(3.5rem, 12vw, 5.5rem); font-weight: 600; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
 .p3-final span { color: var(--muted); font: 13px 'DM Mono', monospace; }
 .p3-stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); }
 .p3-stats div { padding: 12px 14px; }
@@ -218,7 +218,7 @@
 .p3-games { list-style: none; max-height: min(52svh, 440px); overflow-y: auto; border: 1px solid var(--line); scrollbar-width: thin; scrollbar-color: rgba(233, 233, 227, .25) transparent; }
 .p3-games li + li { border-top: 1px solid rgba(233, 233, 227, .08); }
 .p3-games button { width: 100%; display: grid; grid-template-columns: 64px 1fr 36px 70px; gap: 12px; align-items: center; padding: 10px 14px; cursor: pointer; border: 0; background: transparent; color: var(--paper); font: 12px 'DM Mono', monospace; text-align: left; transition: background .2s, color .2s; }
-.p3-games button:hover { background: rgba(212, 255, 85, .07); color: var(--lime); }
+.p3-games button:hover { background: rgba(212, 255, 85, .07); color: var(--lime-text, var(--lime)); }
 .p3-games strong { font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 .p3-games small { color: var(--muted); font-size: 10px; text-align: right; }
 .p3-bar { height: 4px; background: rgba(233, 233, 227, .12); }
@@ -258,7 +258,7 @@
 .p3-msg.is-error button:hover { background: rgba(255, 255, 255, .08); }
 .p3-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .p3-chips button { padding: 7px 11px; cursor: pointer; text-align: left; color: var(--paper); background: transparent; border: 1px solid var(--line); border-radius: 999px; font: 11px/1.35 'DM Mono', monospace; transition: color .2s, border-color .2s, background .2s; }
-.p3-chips button:hover { color: var(--lime); border-color: rgba(212, 255, 85, .5); background: rgba(212, 255, 85, .06); }
+.p3-chips button:hover { color: var(--lime-text, var(--lime)); border-color: rgba(212, 255, 85, .5); background: rgba(212, 255, 85, .06); }
 .p3-ask { display: flex; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, .03); transition: border-color .25s, box-shadow .25s; }
 .p3-ask:focus-within { border-color: rgba(212, 255, 85, .5); box-shadow: 0 0 0 3px rgba(212, 255, 85, .1); }
 .p3-ask input { flex: 1; min-width: 0; padding: 0 12px; border: 0; outline: none; background: transparent; color: var(--paper); font: 12px 'DM Mono', monospace; }

@@ -3,6 +3,7 @@ import Landing from './components/Landing'
 import Page2 from './components/Page2'
 import Page3 from './components/Page3'
 import PFAS_data from './components/PFAS_data'
+import './theme' // applies the saved light/dark choice before the first paint
 
 const routes = {
   '/': Landing,
