@@ -137,8 +137,9 @@
   left: 12px;
   z-index: 1100;
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
   gap: 10px;
+  width: 190px;
   padding: 10px 16px;
   font: 600 14px/1 system-ui, sans-serif;
   color: #1a1a1a;
@@ -146,6 +147,8 @@
   border: 2px solid rgba(0, 0, 0, 0.25);
   border-radius: 8px;
 }
+.page3-score-row { display: flex; align-items: baseline; gap: 10px; }
+.page3-scale { height: 12px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.3); }
 .page3-score strong {
   min-width: 36px;
   font-size: 22px;
@@ -163,20 +166,32 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Heatmap legend, bottom left of the map */
-.page3-legend {
-  position: absolute;
-  left: 12px;
-  bottom: 76px;
-  z-index: 1100;
-  width: 200px;
-  padding: 10px 12px;
-  font: 600 12px/1.2 system-ui, sans-serif;
-  color: #1a1a1a;
-  background: #ffffff;
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  border-radius: 8px;
+
+/* X marking the hottest spot (the 100) */
+.page3-peak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 900 26px/1 system-ui, sans-serif;
+  color: #ffffff;
+  -webkit-text-stroke: 1px #000000;
+  text-shadow: 0 0 3px #000000, 0 0 6px #000000;
 }
-.page3-legend-bar { height: 12px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.3); }
-.page3-legend-ends { display: flex; justify-content: space-between; margin-top: 5px; }
-.page3-legend-note { margin-top: 6px; font-weight: 500; color: #5f6368; }
+
+/* Always-visible label above the X: plain text, no box */
+.leaflet-tooltip.page3-peak-tag {
+  padding: 0;
+  font: 700 13px/1.2 system-ui, sans-serif;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 6px #000;
+}
+.leaflet-tooltip.page3-peak-tag::before { display: none; }
+
+/* 0 / 100 ends and caption under the scale */
+.page3-scale-wrap { display: flex; flex-direction: column; gap: 5px; }
+.page3-scale-ends { display: flex; justify-content: space-between; font-size: 12px; }
+.page3-scale-caption { font-size: 12px; font-weight: 500; color: #5f6368; }

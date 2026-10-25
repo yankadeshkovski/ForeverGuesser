@@ -33,6 +33,9 @@ const RAMP = [
 ];
 const HEAT_OPACITY = 0.6;
 
+// Every point from every map, for freeroam
+const ALL_POINTS = Object.values(POINTS_BY_MAP).flat();
+
 function rampColor(v) {
   for (let i = 1; i < RAMP.length; i++) {
     const [v1, c1] = RAMP[i];
@@ -59,13 +62,14 @@ export default function Page3() {
   const zoomRef = useRef(null);
   const poiLayerRef = useRef(null); // red points with their name tags
   const guessLayerRef = useRef(null); // the blue guess dot
+  const peakLayerRef = useRef(null); // the X marking where the 100 is
   const reqRef = useRef(0); // lets us ignore API replies that arrive after the user moved on
   const [ready, setReady] = useState(false); // true once the Leaflet map exists
   const [locked, setLocked] = useState(LOCKED);
   const [index, setIndex] = useState(0);
   // The current guess: { lat, lng, submitted, score } or null. Forgotten on map change or freeroam.
   const [guess, setGuess] = useState(null);
-  // The heatmap for the current guess: { rows, cols, values, bounds, waterUsed } or null
+  // The heatmap for the current guess: { rows, cols, values, bounds, peak } or null
   const [heat, setHeat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -107,6 +111,7 @@ export default function Page3() {
     zoomRef.current = L.control.zoom({ position: "bottomright" }).addTo(map);
     poiLayerRef.current = L.layerGroup().addTo(map);
     guessLayerRef.current = L.layerGroup().addTo(map);
+    peakLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     setReady(true);
 
@@ -120,36 +125,47 @@ export default function Page3() {
       zoomRef.current = null;
       poiLayerRef.current = null;
       guessLayerRef.current = null;
+      peakLayerRef.current = null;
       setReady(false);
     };
   }, []);
 
-  // Move to the selected map and draw its red points with always-visible name tags
+  // Move to the selected map's fixed view
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-
     applyView(map, current);
+  }, [ready, index]);
+
+  // Red points: locked = only this map's, with always-visible name tags.
+  // Freeroam = every point from every map around the world (name shows on hover).
+  useEffect(() => {
+    if (!ready || !poiLayerRef.current) return;
 
     poiLayerRef.current.clearLayers();
-    (POINTS_BY_MAP[current.id] || []).forEach((p) => {
-      L.circleMarker([p.lat, p.lng], {
-        radius: 7,
+    const pts = locked ? POINTS_BY_MAP[current.id] || [] : ALL_POINTS;
+    pts.forEach((p) => {
+      const dot = L.circleMarker([p.lat, p.lng], {
+        radius: locked ? 7 : 6,
         color: "#ffffff",
         weight: 2,
         fillColor: "#d93025",
         fillOpacity: 1,
-        interactive: false, // clicks pass through, so you can guess right on top of a point
-      })
-        .bindTooltip(p.type, {
+        interactive: !locked, // locked: clicks pass through so you can guess on top of a point
+      });
+      if (locked) {
+        dot.bindTooltip(p.type, {
           permanent: true,
           direction: "top",
           offset: [0, -8],
           className: "page3-poi-tag",
-        })
-        .addTo(poiLayerRef.current);
+        });
+      } else {
+        dot.bindTooltip(p.type, { direction: "top", offset: [0, -6] });
+      }
+      dot.addTo(poiLayerRef.current);
     });
-  }, [ready, index]);
+  }, [ready, index, locked]);
 
   // Click the map to place or move the blue guess dot (only while locked and not submitted)
   useEffect(() => {
@@ -220,6 +236,32 @@ export default function Page3() {
     return () => overlay.remove();
   }, [ready, heat, locked]);
 
+  // Mark where the 100 is with an X, as soon as the heatmap arrives
+  useEffect(() => {
+    if (!ready || !peakLayerRef.current) return;
+    peakLayerRef.current.clearLayers();
+    if (!heat || !heat.peak || !locked) return;
+
+    L.marker([heat.peak.lat, heat.peak.lng], {
+      keyboard: false,
+      interactive: false,
+      zIndexOffset: 1000,
+      icon: L.divIcon({
+        className: "page3-peak",
+        html: "✕",
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      }),
+    })
+      .bindTooltip("Highest PFAS Concentration", {
+        permanent: true,
+        direction: "top",
+        offset: [0, -12],
+        className: "page3-peak-tag",
+      })
+      .addTo(peakLayerRef.current);
+  }, [ready, heat, locked]);
+
   // Lock / unlock zoom and movement
   useEffect(() => {
     const map = mapRef.current;
@@ -278,7 +320,7 @@ export default function Page3() {
         rows: res.rows,
         cols: res.cols,
         values: res.values,
-        waterUsed: res.water_used,
+        peak: res.peak,
         bounds: [
           [bounds.south, bounds.west],
           [bounds.north, bounds.east],
@@ -300,8 +342,20 @@ export default function Page3() {
 
       {locked && (
         <div className="page3-score" aria-live="polite">
-          <span>Score</span>
-          <strong>{submitted ? (guess.score ?? "…") : "–"}</strong>
+          <div className="page3-score-row">
+            <span>Score</span>
+            <strong>{submitted ? (guess.score ?? "…") : "–"}</strong>
+          </div>
+          {heat && (
+            <div className="page3-scale-wrap">
+              <div className="page3-scale" style={{ background: LEGEND_GRADIENT }} />
+              <div className="page3-scale-ends">
+                <span>0</span>
+                <span>100</span>
+              </div>
+              <div className="page3-scale-caption">Scaled PFAS Concentration</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -341,19 +395,6 @@ export default function Page3() {
           </div>
         )}
       </div>
-
-      {locked && heat && (
-        <div className="page3-legend" aria-label="Heatmap legend">
-          <div className="page3-legend-bar" style={{ background: LEGEND_GRADIENT }} />
-          <div className="page3-legend-ends">
-            <span>0 far</span>
-            <span>100 close</span>
-          </div>
-          <div className="page3-legend-note">
-            {heat.waterUsed ? "Includes waterways" : "Waterway data unavailable"}
-          </div>
-        </div>
-      )}
 
       <nav className="page3-nav" aria-label="Main">
         <a href="#/">Landing</a>
