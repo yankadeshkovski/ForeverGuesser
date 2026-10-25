@@ -3,7 +3,7 @@
 // and picking a preset now runs the search straight away.
 import './page2.css'
 import { Component, useState, useRef, useEffect } from 'react'
-import { ArrowUpRight, Beaker, ChevronDown, Database, Info, Play, Search, Send } from 'lucide-react'
+import { ArrowRight, Beaker, ChevronDown, Database, Info, Play, Search, Send } from 'lucide-react'
 import MolViewer from '../molecule.jsx'
 import { getMolecule, ask } from '../api.js'
 
@@ -332,11 +332,8 @@ function Page2() {
         <a
           className="p2-data-btn"
           href="#/PFAS_data"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Open the PFAS database in a new tab"
         >
-          <Database size={15} /> PFAS database <ArrowUpRight size={13} />
+          <Database size={15} /> PFAS database <ArrowRight size={13} />
         </a>
       </header>
  
