@@ -1,4 +1,4 @@
-const BASE = "foreverguesser-backend:10000";
+const BASE = "https://foreverguesser-backend.onrender.com";
 // const BASE = import.meta.env.VITE_API_URL ?? ""
 
 export async function getMolecule(smiles) {
