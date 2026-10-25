@@ -9,11 +9,11 @@ const START_MODE = "fitBounds"; // "fitBounds" or "setView"
 
 // Used when START_MODE is "fitBounds": [[south, west], [north, east]
 // const VIEW_BOUNDS = [[40.7118, -74.0075],[40.7138, -74.0045],];
-const VIEW_BOUNDS = [[40.763381, -73.921509], [40.851605, -73.657837],];
+const VIEW_BOUNDS = [[-16.553442, -68.21703], [-16.497571, -68.085194],];
 
 // Used when START_MODE is "setView"
-const VIEW_CENTER = [40.807493, -73.789673]; // [lat, lng]
-const VIEW_ZOOM = 13;
+const VIEW_CENTER = [-16.525506, -68.151112]; // [lat, lng]
+const VIEW_ZOOM = 14;
 
 const LOCK_MIN_ZOOM = 17; // when you press Lock yourself, you must be zoomed in at least this far
 // ==========================================================

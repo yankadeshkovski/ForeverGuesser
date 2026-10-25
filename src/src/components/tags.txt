@@ -1,7 +1,38 @@
-1, "airport", 40.778830, -73.874130
-1, "seaplane base", 40.845111, -73.816452
-1, "seaplane base", 40.836277, -73.718262
-1, "fire station", 40.835368, -73.827610
-1, "fire station", 40.823934, -73.883228
-1, "fire station", 40.765176, -73.867264
-1, "fire station", 40.815617, -73.686676
+1,"Airport",40.778830,-73.874130
+1,"Seaplane Base",40.845111,-73.816452
+1,"Seaplane Base",40.836277,-73.718262
+1,"Fire Station",40.835368,-73.827610
+1,"Fire Station",40.823934,-73.883228
+1,"Fire Station",40.765176,-73.867264
+1,"Fire Station",40.815617,-73.686676
+2,"Fire Station",29.631067,-82.450848
+2,"Wastewater Treatment Facility",29.619798,-82.411666
+3,"Nestle Factory",19.454605,-96.935635
+3,"Fire Station",19.451043,-96.952972
+3,"Coca Cola Factory",19.452258,-96.943188
+4,"Military Training Base",28.021048,-80.680332
+4,"Airport",28.102872,-80.648575
+4,"Fire Station",28.080604,-80.606861
+4,"Chemical Compounds Company",28.101660,-80.671234
+5,"Airport",48.811891,2.067232
+5,"Train Station",48.795888,2.095728
+5,"Fire Station",48.803409,2.172289
+5,"Fire Station",48.801147,2.130747
+6,"Train Station",17.444172,78.550959
+6,"Industrial Complex with Plants",17.433687,78.565979
+6,"University",17.411242,78.527012
+6,"Fire Station",17.431148,78.548555
+7,"PFAS Producer (firefighting foam)",54.115213,-2.510719
+8,"Military Airfield",53.098958, 26.043949
+8,"Water Treatmean Facility",53.091638,25.977001
+8,"Industrial Factory",53.125138,26.021118
+9,"Port",22.338952,114.119968
+9,"Port",22.313855,114.208202
+9,"Fire Station",22.320845,114.168205
+9,"Fire Station",22.310837,114.173012
+15,"Chemical Compounds Company",13.753700,100.542240
+15,"Logging Company",13.810568,100.521812
+15,"Major Transport Hub",13.801897, 100.544987
+14,"Airport",-16.512800,-68.191967
+14,"Industrial Plant",-16.545970,-68.179350
+14,"Textiles Factory",-16.525970,-68.172312
