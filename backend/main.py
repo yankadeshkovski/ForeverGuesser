@@ -36,8 +36,7 @@ MAX_HEAVY_ATOMS = 200
 MAX_HISTORY_TURNS = 20
 MAX_MESSAGE_CHARS = 500
 
-#@app.post("/api/molecule")
-@app.post("api/molecule")
+@app.post("/api/molecule")
 async def get_molecule(request: Request):
     try:
         data = await request.json()
@@ -104,8 +103,7 @@ INTRO_PROMPT = (
     "where you become a pollutant, and why you're a concern (or why you're not a PFAS)."
 )
 
-#@app.post("/api/ask")
-@app.post("api/ask")
+@app.post("/api/ask")
 async def ask(request: Request):
     try:
         data = await request.json()
@@ -229,8 +227,7 @@ class ZoneReply(BaseModel):
     followups: list[str]
 
 
-#@app.post("/api/zone-chat")
-@app.post("api/zone-chat")
+@app.post("/api/zone-chat")
 async def zone_chat(request: Request):
     try:
         data = await request.json()
