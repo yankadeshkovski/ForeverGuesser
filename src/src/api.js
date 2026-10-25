@@ -51,3 +51,22 @@ export async function getHeatmap(bounds, points, guess) {
   }
   return res.json();
 }
+
+// Atom explains the revealed hotspot and answers follow-ups.
+// payload: { score, km, sources: [{ type, km, weight }], message?, history: [{ role: "user" | "model", text }] }
+// Leave message out for Atom's opening explanation. Resolves to { answer }.
+export async function askZone(payload) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/api/zone-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error("Couldn't reach the server. Is the API running on port 8000?");
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : `API returned ${res.status}`);
+  return body;
+}

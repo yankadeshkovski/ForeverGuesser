@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
-import { ArrowRight, Beaker, Home, Play } from "lucide-react";
+import { ArrowRight, Beaker, Home, Play, Send } from "lucide-react";
 import { MAPS, POINTS_BY_MAP } from "./mapsData";
-import { getHeatmap } from "../api"; // adjust the path to wherever api.js lives
+import { getHeatmap, askZone } from "../api"; // adjust the path to wherever api.js lives
 
 const LOCKED = true; // starting state
 
@@ -52,10 +52,81 @@ const LEGEND_GRADIENT = `linear-gradient(to right, ${RAMP.map(
   ([v, c]) => `rgb(${c.join(",")}) ${v}%`
 ).join(", ")})`;
 
-// Put the map on a given map's saved view (no animation)
-function applyView(map, m) {
-  map.setView(m.center, m.zoom, { animate: false });
+// The map box keeps one fixed shape, so a heat map built for it covers the whole box at any window size
+const MAP_RATIO = 4 / 3;
+const MAP_RATIO_NARROW = 1; // phones: a squarer box keeps the map big enough
+const BREAKPOINT = 760;
+
+// Fit bounds with no zoom snapping, so the area fills the box instead of stopping up to a quarter-zoom short
+function fitExact(map, bounds) {
+  const snap = map.options.zoomSnap;
+  map.options.zoomSnap = 0;
+  map.fitBounds(bounds, { animate: false });
+  map.options.zoomSnap = snap;
 }
+
+// Put the map on a given map's saved view (no animation)
+// Fit the map's whole area into the space available, keeping clear of the progress dots (top) and status pill (bottom)
+function applyView(map, m) {
+  map.invalidateSize({ animate: false });
+  const narrow = map.getSize().x < 560;
+  map.fitBounds(m.bounds, {
+    animate: false,
+    paddingTopLeft: [24, 60],
+    paddingBottomRight: [24, narrow ? 84 : 64],
+  });
+}
+
+// ── What Atom is told about the hotspot ───────────────────────────────────
+// Mirrors WEIGHTS / LAND_CORE / LAND_TAIL / CORE_SHARE in heatmap.py. Used only to rank which
+// sources pull the hotspot toward its spot (sent to Atom as context); the server's heat map stays the source of truth.
+const SOURCE_WEIGHTS = {
+  "PFAS Producer (firefighting foam)": 100, "Chemical Compounds Company": 85,
+  "Military Airfield": 75, "Military Training Base": 75, Airbase: 75,
+  Airport: 70, Landfill: 70, "Textiles Factory": 60, "Garments Manufacturer": 60,
+  "Industrial Factory": 55, "Industrial Plant": 55, "Industrial Complex with Plants": 55,
+  "Industrial Park": 55, "Waste Management Service": 55,
+  "Wastewater Treatment Facility": 50, "Water Treatment Facility": 50, "Seaplane Base": 45,
+  "Fire Station": 40, Port: 40, "Nestle Factory": 30, "Coca Cola Factory": 30,
+  "Major Transport Hub": 25, "Train Station": 20, "Logging Company": 20, University: 15,
+};
+const DEFAULT_WEIGHT = 30;
+const LAND_CORE = 1500, LAND_TAIL = 5000, CORE_SHARE = 0.5; // metres
+
+// Rank the map's sources by how strongly each one pulls on the hotspot (heat_at's formula, per source)
+function buildDrivers(points, peak) {
+  if (!peak || !points?.length) return [];
+  const ranked = points.map((p) => {
+    const km = distanceKm(p, peak);
+    const m = km * 1000;
+    const weight = SOURCE_WEIGHTS[p.type] ?? DEFAULT_WEIGHT;
+    const pull = weight * (CORE_SHARE * Math.exp(-((m / LAND_CORE) ** 2)) + (1 - CORE_SHARE) * Math.exp(-m / LAND_TAIL));
+    return { type: p.type, km, weight, pull };
+  });
+  const sum = ranked.reduce((n, r) => n + r.pull, 0) || 1;
+  return ranked
+    .sort((a, b) => b.pull - a.pull)
+    .slice(0, 6)
+    .map((r) => ({ ...r, share: r.pull / sum }));
+}
+
+// Short fallback questions, only used if Atom doesn't send his own follow-ups
+const AIRFIELD = "What is AFFF?";
+const CHIP_BY_TYPE = {
+  Airport: AIRFIELD, Airbase: AIRFIELD, "Military Airfield": AIRFIELD, "Military Training Base": AIRFIELD, "Seaplane Base": AIRFIELD, "Fire Station": AIRFIELD,
+  Landfill: "How do PFAS leak out?",
+  "Wastewater Treatment Facility": "Why isn't it filtered out?",
+  "Water Treatment Facility": "Why isn't it filtered out?",
+  "Textiles Factory": "Why PFAS in fabric?",
+  "Garments Manufacturer": "Why PFAS in fabric?",
+  Port: "How do ports spread it?",
+};
+const atomChips = (drivers) => {
+  const own = [...new Set(drivers.map((d) => CHIP_BY_TYPE[d.type] ?? "How do factories release it?"))];
+  return [own[0] ?? "How does PFAS spread?", own[1] ?? "How far does it travel?", "Why does it last forever?"];
+};
+
+const overall = (avg) => (avg >= 80 ? "PFAS whisperer" : avg >= 60 ? "Sharp tracker" : avg >= 40 ? "Getting warmer" : "Back to the lab");
 
 function distanceKm(a, b) {
   const R = 6371, r = Math.PI / 180;
@@ -100,6 +171,11 @@ export default function Page3() {
   const poiLayerRef = useRef(null); // red points with their name tags
   const guessLayerRef = useRef(null); // the guess dot
   const peakLayerRef = useRef(null); // the X marking where the 100 is
+  const lockedRef = useRef(LOCKED);
+  const heatBoundsRef = useRef(null); // bounds of the heat map on screen, or null
+  const slotRef = useRef(null); // the grid cell the map box is centered in
+  const [box, setBox] = useState(null); // { w, h } px of the fixed-shape map box
+  const indexRef = useRef(0);
   const reqRef = useRef(0); // lets us ignore API replies that arrive after the user moved on
   const [ready, setReady] = useState(false); // true once the Leaflet map exists
   const [locked, setLocked] = useState(LOCKED);
@@ -110,13 +186,46 @@ export default function Page3() {
   const [heat, setHeat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Atom's conversation per map: { [mapId]: { messages: [{ role: "model" | "user", text }], status: "idle" | "loading" | "error", error } }
+  const [chats, setChats] = useState({});
+  const [chatInput, setChatInput] = useState("");
+  const chatsRef = useRef({});
+  const atomEpochRef = useRef(0); // bumped on Play again so late replies from an old round are dropped
+  const logRef = useRef(null);
 
   const current = MAPS[index];
+  lockedRef.current = locked;
+  indexRef.current = index;
   const submitted = !!guess?.submitted;
   const [scores, setScores] = useState({}); // { [mapId]: { score, km } } for the whole round
   const shown = useCountUp(guess?.score ?? null);
   const total = Object.values(scores).reduce((n, r) => n + r.score, 0);
   const result = scores[current.id];
+  const count = Object.keys(scores).length;
+  const finished = count === MAPS.length;
+  const nextIdx = finished ? -1 : MAPS.map((_, k) => (index + 1 + k) % MAPS.length).find((i) => !scores[MAPS[i].id]);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryView, setSummaryView] = useState("total"); // "total" | "games"
+  const [summarySeen, setSummarySeen] = useState(false);
+  const finalShown = useCountUp(showSummary && summaryView === "total" ? total : null, 1600);
+  const entries = MAPS.map((m) => ({ id: m.id, ...scores[m.id] }));
+  const best = finished ? entries.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+  const worst = finished ? entries.reduce((a, b) => (b.score < a.score ? b : a)) : null;
+  const avg = count ? Math.round(total / count) : 0;
+  chatsRef.current = chats;
+  heatBoundsRef.current = heat?.bounds ?? null;
+  const chat = chats[current.id];
+  const chatMsgs = chat?.messages ?? [];
+  const chatStatus = chat?.status ?? "idle";
+  // Tap-to-ask questions under Atom's latest message: his own teasers, or short fallbacks for his first message
+  const lastMsg = chatMsgs[chatMsgs.length - 1];
+  const chips = lastMsg?.role !== "model" ? [] : lastMsg.followups?.length ? lastMsg.followups : chatMsgs.length === 1 && scores[current.id] ? atomChips(scores[current.id].drivers) : [];
+
+  // Keep the newest line of the conversation in view
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chatMsgs.length, chatStatus, current.id]);
 
   // Forget the guess, the heatmap and any request still in flight
   const resetGuess = () => {
@@ -136,6 +245,7 @@ export default function Page3() {
       maxBounds: WORLD_BOUNDS,
       maxBoundsViscosity: 1.0,
       zoomControl: false,
+      zoomSnap: 0.25,
     });
 
     // Heatmap sits above the tiles but under the red points and the guess dot
@@ -171,12 +281,69 @@ export default function Page3() {
     };
   }, []);
 
+  // Size the map box: the biggest fixed-shape rectangle that fits its cell, so it never stretches
+  useEffect(() => {
+    const el = slotRef.current;
+    if (!el) return;
+    const measure = () => {
+      const { width: W, height: H } = el.getBoundingClientRect();
+      if (!W || !H) return;
+      const r = W <= BREAKPOINT ? MAP_RATIO_NARROW : MAP_RATIO;
+      const w = Math.floor(Math.min(W, H * r));
+      const h = Math.floor(w / r);
+      setBox((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Re-fit whenever the map's box changes size (window resize, sidebar wrapping, first layout)
+  useEffect(() => {
+    if (!ready || !containerRef.current) return;
+    const ro = new ResizeObserver(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      map.invalidateSize({ animate: false });
+      if (!lockedRef.current) return;
+      // With a heat map showing, keep the whole heat map in view; otherwise the map's saved view
+      if (heatBoundsRef.current) fitExact(map, heatBoundsRef.current);
+      else applyView(map, MAPS[indexRef.current]);
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  // When the last map is scored, let the reveal play, then show the final results
+  useEffect(() => {
+    if (!finished || summarySeen) return;
+    const t = setTimeout(() => { setSummaryView("total"); setShowSummary(true); setSummarySeen(true); }, 2600);
+    return () => clearTimeout(t);
+  }, [finished, summarySeen]);
+
+  useEffect(() => {
+    if (!showSummary) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowSummary(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSummary]);
+
   // Move to the selected map's fixed view
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
     applyView(map, current);
   }, [ready, index]);
+
+  // When a heat map is showing (new reveal, or a finished map reopened), frame exactly the area it covers.
+  // Declared after the effect above so it wins when both run in the same render.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !heat || !locked) return;
+    map.invalidateSize({ animate: false });
+    fitExact(map, heat.bounds);
+  }, [ready, heat, locked]);
 
   // Red points: locked = only this map's, with always-visible name tags.
   // Freeroam = every point from every map around the world (name shows on hover).
@@ -326,12 +493,64 @@ export default function Page3() {
     }
   }, [ready, locked]);
 
-  // Sequential cycle: 1 -> 2 -> ... -> 15 -> 1
-  // Changing maps always lands on the locked, fixed view and forgets the guess and heatmap
-  const go = (delta) => {
+  // Ask Atom. message = null asks for his opening explanation of the zone; otherwise it is the player's follow-up.
+  const talkToAtom = async (mapId, entry, message) => {
+    const epoch = atomEpochRef.current;
+    const prior = chatsRef.current[mapId]?.messages ?? [];
+    const withUser = message ? [...prior, { role: "user", text: message }] : prior;
+    setChats((p) => ({ ...p, [mapId]: { messages: withUser, status: "loading", error: "" } }));
+    try {
+      const res = await askZone({
+        score: entry.score,
+        km: entry.km,
+        sources: entry.drivers.map((d) => ({ type: d.type, km: Math.round(d.km * 100) / 100, weight: d.weight })),
+        message,
+        history: prior.map(({ role, text }) => ({ role, text })),
+      });
+      if (epoch !== atomEpochRef.current) return;
+      setChats((p) => ({ ...p, [mapId]: { messages: [...withUser, { role: "model", text: res.answer, followups: res.followups ?? [] }], status: "idle", error: "" } }));
+    } catch (err) {
+      if (epoch !== atomEpochRef.current) return;
+      // Put the question back in the box so nothing is lost and history stays in valid turn order
+      if (message) setChatInput(message);
+      setChats((p) => ({ ...p, [mapId]: { messages: prior, status: "error", error: err.message } }));
+    }
+  };
+
+  const sendToAtom = (text) => {
+    const msg = text.trim();
+    const entry = scores[current.id];
+    if (!msg || !entry || chatStatus === "loading") return;
+    setChatInput("");
+    talkToAtom(current.id, entry, msg);
+  };
+
+  // Bring back a finished game's pin and heat map so it can be reviewed
+  const restore = (id) => {
+    const r = scores[id];
+    if (!r) return;
+    setGuess({ lat: r.guess.lat, lng: r.guess.lng, submitted: true, score: r.score });
+    setHeat(r.heat);
+  };
+
+  // Jump to a map. Always lands on the locked, fixed view; a map you already played shows its saved result.
+  const goTo = (i) => {
     resetGuess();
     setLocked(true);
-    setIndex((i) => (i + delta + MAPS.length) % MAPS.length);
+    setIndex(i);
+    restore(MAPS[i].id);
+  };
+
+  const playAgain = () => {
+    resetGuess();
+    atomEpochRef.current++;
+    setChats({});
+    setChatInput("");
+    setScores({});
+    setSummarySeen(false);
+    setShowSummary(false);
+    setLocked(true);
+    setIndex(0);
   };
 
   const handleModeClick = () => {
@@ -345,6 +564,7 @@ export default function Page3() {
       // Locking snaps back to this map's fixed fragment
       applyView(map, current);
       setLocked(true);
+      restore(current.id);
     }
   };
 
@@ -366,7 +586,7 @@ export default function Page3() {
         lng: guess.lng,
       });
       if (id !== reqRef.current) return; // user moved on; drop the result
-      setHeat({
+      const heatData = {
         rows: res.rows,
         cols: res.cols,
         values: res.values,
@@ -376,11 +596,20 @@ export default function Page3() {
           [bounds.south, bounds.west],
           [bounds.north, bounds.east],
         ],
-      });
+      };
+      setHeat(heatData);
       setGuess((prev) => (prev ? { ...prev, score: res.score } : prev));
       const km = res.peak ? distanceKm(guess, res.peak) : null;
-      setScores((prev) => ({ ...prev, [current.id]: { score: res.score, km } }));
+      const entry = {
+        score: res.score,
+        km,
+        guess: { lat: guess.lat, lng: guess.lng },
+        heat: heatData,
+        drivers: buildDrivers(POINTS_BY_MAP[current.id] || [], res.peak),
+      };
+      setScores((prev) => ({ ...prev, [current.id]: entry }));
       setLoading(false);
+      talkToAtom(current.id, entry, null); // Atom explains the zone as soon as it is revealed
     } catch (err) {
       if (id !== reqRef.current) return;
       setGuess((prev) => (prev ? { ...prev, submitted: false } : prev)); // let them try again
@@ -403,9 +632,9 @@ export default function Page3() {
         <a className="p3-wordmark" href="#/"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
 
         <div className="p3-cycle">
-          <button type="button" onClick={() => go(-1)} aria-label="Previous map">‹</button>
+          <button type="button" onClick={() => goTo((index - 1 + MAPS.length) % MAPS.length)} aria-label="Previous map">‹</button>
           <span className="p3-label" aria-live="polite">Map {current.id} of {MAPS.length}</span>
-          <button type="button" onClick={() => go(1)} aria-label="Next map">›</button>
+          <button type="button" onClick={() => goTo((index + 1) % MAPS.length)} aria-label="Next map">›</button>
         </div>
 
         <button
@@ -428,57 +657,169 @@ export default function Page3() {
       </header>
 
       <section className="p3-stage">
-        <div ref={containerRef} className="p3-map" />
-        {loading && <div className="p3-scanline" />}
-
-        {locked && (
-          <div className={`p3-panel p3-score${heat ? " is-scored" : ""}`} aria-live="polite">
-            <div className="p3-score-row">
-              <span className="p3-eyebrow">Score</span>
-              <strong>{submitted ? (guess.score != null ? shown : "…") : "–"}</strong>
-            </div>
-            {heat && result && (
-              <div className="p3-result">
-                <h3>{verdict(result.score)}</h3>
-                {result.km != null && <p>{fmtKm(result.km)} km from the hotspot</p>}
-                <div className="p3-scale-wrap">
-                  <div className="p3-scale" style={{ background: LEGEND_GRADIENT }} />
-                  <div className="p3-scale-ends"><span>0</span><span>100</span></div>
-                  <div className="p3-scale-caption">Scaled PFAS concentration</div>
+        <aside className="p3-side" aria-label="Score and Atom">
+          {locked ? (
+            <>
+              <div className={`p3-score${heat ? " is-scored" : ""}`} aria-live="polite">
+                <div className="p3-score-row">
+                  <span className="p3-eyebrow">Score</span>
+                  <strong>{submitted ? (guess.score != null ? shown : "…") : "–"}</strong>
                 </div>
-                <button type="button" className="p3-btn p3-btn-lime" onClick={() => go(1)}>
-                  Next map <ArrowRight size={14} />
-                </button>
+                {heat && result ? (
+                  <div className="p3-result">
+                    <h3>{verdict(result.score)}</h3>
+                    {result.km != null && <p>{fmtKm(result.km)} km from the hotspot</p>}
+                    <div className="p3-scale-wrap">
+                      <div className="p3-scale" style={{ background: LEGEND_GRADIENT }} />
+                      <div className="p3-scale-ends"><span>0</span><span>100</span></div>
+                      <div className="p3-scale-caption">Scaled PFAS concentration</div>
+                    </div>
+                    {finished ? (
+                      <button type="button" className="p3-btn p3-btn-lime" onClick={() => { setSummaryView("total"); setShowSummary(true); }}>
+                        Final results <ArrowRight size={14} />
+                      </button>
+                    ) : (
+                      <button type="button" className="p3-btn p3-btn-lime" onClick={() => goTo(nextIdx)}>
+                        Next map <ArrowRight size={14} />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="p3-tip">Drop a pin where you think PFAS concentration peaks. Red points are likely sources. After you submit, Atom explains why the hotspot sits where it does.</p>
+                )}
+                {total > 0 && (
+                  <div className="p3-total">
+                    <span>Round total</span>
+                    <span>{total}<small> / {MAPS.length * 100}</small></span>
+                  </div>
+                )}
               </div>
-            )}
-            {total > 0 && (
-              <div className="p3-total">
-                <span>Round total</span>
-                <span>{total}<small> / {MAPS.length * 100}</small></span>
-              </div>
+
+              {heat && result && (
+                <section className="p3-atom" aria-label="Chat with Atom">
+                  <div className="p3-atom-head">
+                    <span className="p3-atom-dot" aria-hidden="true" />
+                    <span className="p3-eyebrow">Atom</span>
+                    <span className="p3-atom-sub">Ask me about this zone</span>
+                  </div>
+
+                  <div className="p3-atom-log" ref={logRef} role="log" aria-live="polite">
+                    {chatMsgs.map((m, i) => (
+                      <p key={i} className={`p3-msg ${m.role === "model" ? "is-atom" : "is-you"}`}>{m.text}</p>
+                    ))}
+                    {chatStatus === "loading" && (
+                      <p className="p3-msg is-atom is-typing" role="status" aria-label="Atom is typing"><i /><i /><i /></p>
+                    )}
+                    {chatStatus === "error" && (
+                      <div className="p3-msg is-error" role="alert">
+                        <span>{chat.error || "Atom couldn't answer."}</span>
+                        {chatMsgs.length === 0 && (
+                          <button type="button" onClick={() => talkToAtom(current.id, result, null)}>Try again</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {chatStatus === "idle" && chips.length > 0 && (
+                    <div className="p3-chips">
+                      {chips.map((q) => (
+                        <button key={q} type="button" onClick={() => sendToAtom(q)}>{q}</button>
+                      ))}
+                    </div>
+                  )}
+
+                  <form className="p3-ask" onSubmit={(e) => { e.preventDefault(); sendToAtom(chatInput); }}>
+                    <input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      maxLength={500}
+                      placeholder="Ask Atom a question"
+                      aria-label="Ask Atom a question"
+                      disabled={chatStatus === "loading" || chatMsgs.length === 0}
+                    />
+                    <button type="submit" className="p3-btn p3-btn-lime" disabled={!chatInput.trim() || chatStatus === "loading"} aria-label="Send">
+                      <Send size={14} />
+                    </button>
+                  </form>
+                </section>
+              )}
+            </>
+          ) : (
+            <p className="p3-tip">Freeroam shows every site on every map. Choose Back to round to keep playing.</p>
+          )}
+        </aside>
+
+        <div className="p3-mapslot" ref={slotRef}>
+        <div className="p3-mapwrap" style={box ? { width: box.w, height: box.h } : undefined}>
+          <div ref={containerRef} className="p3-map" />
+          {loading && <div className="p3-scanline" />}
+
+          <div className="p3-panel p3-progress" role="group" aria-label="Maps in this round">
+            {MAPS.map((m, i) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`p3-tick${i === index ? " is-current" : ""}${scores[m.id] ? " is-done" : ""}`}
+                onClick={() => goTo(i)}
+                aria-label={`Map ${m.id}${scores[m.id] ? `, scored ${scores[m.id].score}` : ""}`}
+                aria-current={i === index ? "true" : undefined}
+                title={scores[m.id] ? `Map ${m.id}: ${scores[m.id].score}` : `Map ${m.id}`}
+              />
+            ))}
+          </div>
+
+          <div className={`p3-panel p3-status${error ? " is-error" : ""}`} role={error ? "alert" : "status"}>
+            <span className="p3-live" />
+            <span>{status}</span>
+          </div>
+        </div>
+        </div>
+
+      </section>
+
+      {showSummary && (
+        <div className="p3-modal" role="dialog" aria-modal="true" aria-labelledby="p3-sum-title">
+          <div className="p3-modal-card">
+            {summaryView === "total" ? (
+              <>
+                <span className="p3-eyebrow">Round complete</span>
+                <h2 id="p3-sum-title">{overall(avg)}</h2>
+                <div className="p3-final"><strong>{finalShown}</strong><span>/ {MAPS.length * 100}</span></div>
+                <dl className="p3-stats">
+                  <div><dt>Average</dt><dd>{avg} per map</dd></div>
+                  <div><dt>Best</dt><dd>Map {best.id}: {best.score}</dd></div>
+                  <div><dt>Toughest</dt><dd>Map {worst.id}: {worst.score}</dd></div>
+                </dl>
+                <div className="p3-modal-actions">
+                  <button type="button" autoFocus className="p3-btn p3-btn-lime" onClick={playAgain}>Play again</button>
+                  <button type="button" className="p3-btn p3-btn-ghost" onClick={() => setSummaryView("games")}>View your games</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="p3-eyebrow">Your games</span>
+                <h2 id="p3-sum-title">Open any map to see your pin</h2>
+                <ul className="p3-games">
+                  {entries.map((r) => (
+                    <li key={r.id}>
+                      <button type="button" onClick={() => { setShowSummary(false); goTo(MAPS.findIndex((m) => m.id === r.id)); }}>
+                        <span>Map {r.id}</span>
+                        <span className="p3-bar"><i style={{ width: `${r.score}%` }} /></span>
+                        <strong>{r.score}</strong>
+                        <small>{r.km != null ? `${fmtKm(r.km)} km` : ""}</small>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="p3-modal-actions">
+                  <button type="button" className="p3-btn p3-btn-ghost" onClick={() => setSummaryView("total")}>Back</button>
+                  <button type="button" className="p3-btn p3-btn-lime" onClick={playAgain}>Play again</button>
+                </div>
+              </>
             )}
           </div>
-        )}
-
-        <div className="p3-panel p3-progress" role="group" aria-label="Maps in this round">
-          {MAPS.map((m, i) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`p3-tick${i === index ? " is-current" : ""}${scores[m.id] ? " is-done" : ""}`}
-              onClick={() => go(i - index)}
-              aria-label={`Map ${m.id}${scores[m.id] ? `, scored ${scores[m.id].score}` : ""}`}
-              aria-current={i === index ? "true" : undefined}
-              title={scores[m.id] ? `Map ${m.id}: ${scores[m.id].score}` : `Map ${m.id}`}
-            />
-          ))}
         </div>
-
-        <div className={`p3-panel p3-status${error ? " is-error" : ""}`} role={error ? "alert" : "status"}>
-          <span className="p3-live" />
-          <span>{status}</span>
-        </div>
-      </section>
+      )}
 
       <nav className="p3-dock" aria-label="Main">
         <a href="#/"><Home size={14} /> Home</a>
