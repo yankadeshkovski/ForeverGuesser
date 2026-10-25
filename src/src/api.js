@@ -30,3 +30,24 @@ export async function ask(smiles, message, history) {
   if (!res.ok) throw new Error(body.detail || 'Request failed')
   return body
 }
+
+// Builds the PFAS heatmap for the visible map and scores the guess.
+// bounds: { south, west, north, east }   points: [{ type, lat, lng }]   guess: { lat, lng }
+export async function getHeatmap(bounds, points, guess) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/api/heatmap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bounds, points, guess }),
+    });
+  } catch {
+    throw new Error("Couldn't reach the server. Is the API running on port 8000?");
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : `API returned ${res.status}`);
+  }
+  return res.json();
+}

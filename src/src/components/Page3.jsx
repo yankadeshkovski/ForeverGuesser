@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
 import { MAPS, POINTS_BY_MAP } from "./mapsData";
+import { getHeatmap } from "../api"; // adjust the path to wherever api.js lives
 
 const LOCKED = true; // starting state
 
@@ -22,6 +23,31 @@ const HANDLERS = [
   "keyboard",
 ];
 
+// Heatmap colours: 0 = far from PFAS (yellow) ... 100 = close (purple).
+// Fixed stops, so the same value is always the same colour on every map.
+const RAMP = [
+  [0, [255, 233, 77]],
+  [35, [246, 166, 35]],
+  [65, [214, 51, 108]],
+  [100, [91, 26, 143]],
+];
+const HEAT_OPACITY = 0.6;
+
+function rampColor(v) {
+  for (let i = 1; i < RAMP.length; i++) {
+    const [v1, c1] = RAMP[i];
+    if (v <= v1) {
+      const [v0, c0] = RAMP[i - 1];
+      const t = (v - v0) / (v1 - v0);
+      return c0.map((c, k) => Math.round(c + (c1[k] - c) * t));
+    }
+  }
+  return RAMP[RAMP.length - 1][1];
+}
+const LEGEND_GRADIENT = `linear-gradient(to right, ${RAMP.map(
+  ([v, c]) => `rgb(${c.join(",")}) ${v}%`
+).join(", ")})`;
+
 // Put the map on a given map's saved view (no animation)
 function applyView(map, m) {
   map.setView(m.center, m.zoom, { animate: false });
@@ -33,14 +59,28 @@ export default function Page3() {
   const zoomRef = useRef(null);
   const poiLayerRef = useRef(null); // red points with their name tags
   const guessLayerRef = useRef(null); // the blue guess dot
+  const reqRef = useRef(0); // lets us ignore API replies that arrive after the user moved on
   const [ready, setReady] = useState(false); // true once the Leaflet map exists
   const [locked, setLocked] = useState(LOCKED);
   const [index, setIndex] = useState(0);
   // The current guess: { lat, lng, submitted, score } or null. Forgotten on map change or freeroam.
   const [guess, setGuess] = useState(null);
+  // The heatmap for the current guess: { rows, cols, values, bounds, waterUsed } or null
+  const [heat, setHeat] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const current = MAPS[index];
   const submitted = !!guess?.submitted;
+
+  // Forget the guess, the heatmap and any request still in flight
+  const resetGuess = () => {
+    reqRef.current++;
+    setGuess(null);
+    setHeat(null);
+    setLoading(false);
+    setError("");
+  };
 
   // Create the map once
   useEffect(() => {
@@ -52,6 +92,9 @@ export default function Page3() {
       maxBoundsViscosity: 1.0,
       zoomControl: false,
     });
+
+    // Heatmap sits above the tiles but under the red points and the guess dot
+    map.createPane("heatPane").style.zIndex = 350;
 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       minZoom: MIN_ZOOM,
@@ -108,24 +151,25 @@ export default function Page3() {
     });
   }, [ready, index]);
 
-  // Click the map to place or move the blue guess dot (until it is submitted)
+  // Click the map to place or move the blue guess dot (only while locked and not submitted)
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map || submitted || !locked) return;
 
     const onClick = (e) => {
       const { lat, lng } = e.latlng;
+      setError("");
       setGuess({ lat, lng, submitted: false, score: null });
     };
     map.on("click", onClick);
     return () => map.off("click", onClick);
   }, [ready, index, submitted, locked]);
 
-  // Draw the blue guess dot for this map; draggable until submitted
+  // Draw the blue guess dot; draggable until submitted
   useEffect(() => {
     if (!ready || !guessLayerRef.current) return;
     guessLayerRef.current.clearLayers();
-    if (!guess || !locked) return; // hidden while in freeroam
+    if (!guess || !locked) return;
 
     const marker = L.marker([guess.lat, guess.lng], {
       draggable: !guess.submitted,
@@ -145,6 +189,37 @@ export default function Page3() {
     }
   }, [ready, index, guess, locked]);
 
+  // Paint the heatmap over the map fragment
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !heat || !locked) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = heat.cols;
+    canvas.height = heat.rows;
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(heat.cols, heat.rows);
+    const lut = Array.from({ length: 101 }, (_, v) => rampColor(v));
+    heat.values.forEach((row, y) =>
+      row.forEach((v, x) => {
+        const [r, g, b] = lut[Math.max(0, Math.min(100, v))];
+        const o = (y * heat.cols + x) * 4;
+        img.data[o] = r;
+        img.data[o + 1] = g;
+        img.data[o + 2] = b;
+        img.data[o + 3] = 255;
+      })
+    );
+    ctx.putImageData(img, 0, 0);
+
+    const overlay = L.imageOverlay(canvas.toDataURL(), heat.bounds, {
+      pane: "heatPane",
+      opacity: HEAT_OPACITY,
+      interactive: false,
+    }).addTo(map);
+    return () => overlay.remove();
+  }, [ready, heat, locked]);
+
   // Lock / unlock zoom and movement
   useEffect(() => {
     const map = mapRef.current;
@@ -160,9 +235,9 @@ export default function Page3() {
   }, [ready, locked]);
 
   // Sequential cycle: 1 -> 2 -> ... -> 15 -> 1
-  // Changing maps always lands on the locked, fixed view and forgets the guess
+  // Changing maps always lands on the locked, fixed view and forgets the guess and heatmap
   const go = (delta) => {
-    setGuess(null);
+    resetGuess();
     setLocked(true);
     setIndex((i) => (i + delta + MAPS.length) % MAPS.length);
   };
@@ -171,8 +246,8 @@ export default function Page3() {
     const map = mapRef.current;
     if (!map) return;
     if (locked) {
-      // Entering freeroam forgets the guess and score
-      setGuess(null);
+      // Entering freeroam forgets the guess, score and heatmap
+      resetGuess();
       setLocked(false);
     } else {
       // Locking snaps back to this map's fixed fragment
@@ -181,10 +256,42 @@ export default function Page3() {
     }
   };
 
-  const handleSubmit = () => {
-    if (!locked || !guess || submitted) return;
-    const score = Math.floor(Math.random() * 101); // random 0-100 for now
-    setGuess((prev) => ({ ...prev, submitted: true, score }));
+  const handleSubmit = async () => {
+    const map = mapRef.current;
+    if (!map || !locked || !guess || submitted || loading) return;
+
+    const id = ++reqRef.current;
+    const b = map.getBounds(); // exactly what the player can see
+    const bounds = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
+
+    setError("");
+    setLoading(true);
+    setGuess((prev) => ({ ...prev, submitted: true })); // freeze the dot while the API works
+
+    try {
+      const res = await getHeatmap(bounds, POINTS_BY_MAP[current.id] || [], {
+        lat: guess.lat,
+        lng: guess.lng,
+      });
+      if (id !== reqRef.current) return; // user moved on; drop the result
+      setHeat({
+        rows: res.rows,
+        cols: res.cols,
+        values: res.values,
+        waterUsed: res.water_used,
+        bounds: [
+          [bounds.south, bounds.west],
+          [bounds.north, bounds.east],
+        ],
+      });
+      setGuess((prev) => (prev ? { ...prev, score: res.score } : prev));
+      setLoading(false);
+    } catch (err) {
+      if (id !== reqRef.current) return;
+      setGuess((prev) => (prev ? { ...prev, submitted: false } : prev)); // let them try again
+      setError(err.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -194,7 +301,7 @@ export default function Page3() {
       {locked && (
         <div className="page3-score" aria-live="polite">
           <span>Score</span>
-          <strong>{submitted ? guess.score : "–"}</strong>
+          <strong>{submitted ? (guess.score ?? "…") : "–"}</strong>
         </div>
       )}
 
@@ -223,11 +330,30 @@ export default function Page3() {
           type="button"
           className="page3-submit"
           onClick={handleSubmit}
-          disabled={!locked || !guess || submitted}
+          disabled={!locked || !guess || submitted || loading}
         >
-          {submitted ? "GUESS SUBMITTED" : "SUBMIT GUESS"}
+          {loading ? "BUILDING HEATMAP…" : submitted ? "GUESS SUBMITTED" : "SUBMIT GUESS"}
         </button>
+
+        {error && (
+          <div className="page3-error" role="alert">
+            {error}
+          </div>
+        )}
       </div>
+
+      {locked && heat && (
+        <div className="page3-legend" aria-label="Heatmap legend">
+          <div className="page3-legend-bar" style={{ background: LEGEND_GRADIENT }} />
+          <div className="page3-legend-ends">
+            <span>0 far</span>
+            <span>100 close</span>
+          </div>
+          <div className="page3-legend-note">
+            {heat.waterUsed ? "Includes waterways" : "Waterway data unavailable"}
+          </div>
+        </div>
+      )}
 
       <nav className="page3-nav" aria-label="Main">
         <a href="#/">Landing</a>

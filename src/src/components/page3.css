@@ -151,3 +151,32 @@
   font-size: 22px;
   font-variant-numeric: tabular-nums;
 }
+
+/* API error under the submit button */
+.page3-error {
+  max-width: 220px;
+  padding: 10px 12px;
+  font: 500 13px/1.4 system-ui, sans-serif;
+  color: #ffffff;
+  background: #b3261e;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Heatmap legend, bottom left of the map */
+.page3-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 76px;
+  z-index: 1100;
+  width: 200px;
+  padding: 10px 12px;
+  font: 600 12px/1.2 system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #ffffff;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+.page3-legend-bar { height: 12px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.3); }
+.page3-legend-ends { display: flex; justify-content: space-between; margin-top: 5px; }
+.page3-legend-note { margin-top: 6px; font-weight: 500; color: #5f6368; }
