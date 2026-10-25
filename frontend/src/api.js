@@ -1,4 +1,4 @@
-const BASE = "foreverguesser-backend:10000";
+const BASE = "http://0.0.0.0:10000/";
 
 export async function getMolecule(smiles) {
   let res;

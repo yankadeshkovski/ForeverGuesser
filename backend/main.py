@@ -23,6 +23,7 @@ app.include_router(heatmap_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://foreverguesser.onrender.com"],  # Vite's default; CRA uses 3000
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
