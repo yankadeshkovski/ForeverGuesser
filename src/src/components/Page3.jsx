@@ -2,21 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
+import { MAPS, POINTS_BY_MAP } from "./mapsData";
 
-// ======================= EDIT THESE =======================
-const LOCKED = true; // starting state: true = frozen on the fragment below (the Lock button can toggle it)
-const START_MODE = "fitBounds"; // "fitBounds" or "setView"
-
-// Used when START_MODE is "fitBounds": [[south, west], [north, east]
-// const VIEW_BOUNDS = [[40.7118, -74.0075],[40.7138, -74.0045],];
-const VIEW_BOUNDS = [[-16.553442, -68.21703], [-16.497571, -68.085194],];
-
-// Used when START_MODE is "setView"
-const VIEW_CENTER = [-16.525506, -68.151112]; // [lat, lng]
-const VIEW_ZOOM = 14;
-
-const LOCK_MIN_ZOOM = 17; // when you press Lock yourself, you must be zoomed in at least this far
-// ==========================================================
+const LOCKED = true; // starting state
 
 const MIN_ZOOM = 3;
 const WORLD_BOUNDS = [
@@ -34,42 +22,36 @@ const HANDLERS = [
   "keyboard",
 ];
 
-const fmt = (n) => n.toFixed(6); // about 0.1 m of precision
-
-// Put the map on the chosen fragment (no animation, so the lock can't catch it mid-move)
-function applyView(map) {
-  if (START_MODE === "setView") {
-    map.setView(VIEW_CENTER, VIEW_ZOOM, { animate: false });
-  } else {
-    map.fitBounds(VIEW_BOUNDS, { animate: false });
-  }
+// Put the map on a given map's saved view (no animation)
+function applyView(map, m) {
+  map.setView(m.center, m.zoom, { animate: false });
 }
 
 export default function Page3() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const zoomRef = useRef(null); // the +/- buttons, so they can be hidden while locked
-  const layerRef = useRef(null); // holds the dots drawn for clicked points
-  const counterRef = useRef(0); // numbers the clicked points
-  const noticeTimer = useRef(null);
-  const lockedRef = useRef(LOCKED); // lets the startup timer know if the map is still locked
+  const zoomRef = useRef(null);
+  const poiLayerRef = useRef(null); // red points with their name tags
+  const guessLayerRef = useRef(null); // the blue guess dot
+  const [ready, setReady] = useState(false); // true once the Leaflet map exists
   const [locked, setLocked] = useState(LOCKED);
-  const [notice, setNotice] = useState("");
-  const [points, setPoints] = useState([]);
+  const [index, setIndex] = useState(0);
+  // The current guess: { lat, lng, submitted, score } or null. Forgotten on map change or freeroam.
+  const [guess, setGuess] = useState(null);
+
+  const current = MAPS[index];
+  const submitted = !!guess?.submitted;
 
   // Create the map once
   useEffect(() => {
-    // Guard against double-initialisation (React StrictMode runs effects twice in dev)
     if (mapRef.current || !containerRef.current) return;
 
     const map = L.map(containerRef.current, {
       minZoom: MIN_ZOOM,
       maxBounds: WORLD_BOUNDS,
       maxBoundsViscosity: 1.0,
-      zoomControl: false, // added below at the bottom right, away from the points panel
+      zoomControl: false,
     });
-
-    applyView(map);
 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       minZoom: MIN_ZOOM,
@@ -80,134 +62,172 @@ export default function Page3() {
     }).addTo(map);
 
     zoomRef.current = L.control.zoom({ position: "bottomright" }).addTo(map);
-    layerRef.current = L.layerGroup().addTo(map);
+    poiLayerRef.current = L.layerGroup().addTo(map);
+    guessLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    setReady(true);
 
-    // Record every click as a numbered point
-    map.on("click", (e) => {
-      const n = ++counterRef.current;
-      const { lat, lng } = e.latlng;
-
-      L.circleMarker([lat, lng], {
-        radius: 6,
-        color: "#ffffff",
-        weight: 2,
-        fillColor: "#d93025",
-        fillOpacity: 1,
-        interactive: false, // clicks pass through to the map
-      })
-        .bindTooltip(String(n), { permanent: true, direction: "top", offset: [0, -6] })
-        .addTo(layerRef.current);
-
-      setPoints((prev) => [...prev, { id: n, lat, lng }]);
-    });
-
-    // Once the layout has settled, re-measure and re-apply the same fragment
-    const timer = setTimeout(() => {
-      map.invalidateSize({ animate: false });
-      if (mapRef.current && lockedRef.current) applyView(map);
-    }, 100);
+    // Re-measure once the layout has settled
+    const timer = setTimeout(() => map.invalidateSize({ animate: false }), 100);
 
     return () => {
       clearTimeout(timer);
       map.remove();
       mapRef.current = null;
       zoomRef.current = null;
-      layerRef.current = null;
-      counterRef.current = 0;
+      poiLayerRef.current = null;
+      guessLayerRef.current = null;
+      setReady(false);
     };
   }, []);
 
-  // Keep the startup timer's view of "locked" up to date
-  useEffect(() => {
-    lockedRef.current = locked;
-  }, [locked]);
-
-  // Lock / unlock zoom and movement (also runs once at startup to apply LOCKED)
+  // Move to the selected map and draw its red points with always-visible name tags
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!ready || !map) return;
+
+    applyView(map, current);
+
+    poiLayerRef.current.clearLayers();
+    (POINTS_BY_MAP[current.id] || []).forEach((p) => {
+      L.circleMarker([p.lat, p.lng], {
+        radius: 7,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: "#d93025",
+        fillOpacity: 1,
+        interactive: false, // clicks pass through, so you can guess right on top of a point
+      })
+        .bindTooltip(p.type, {
+          permanent: true,
+          direction: "top",
+          offset: [0, -8],
+          className: "page3-poi-tag",
+        })
+        .addTo(poiLayerRef.current);
+    });
+  }, [ready, index]);
+
+  // Click the map to place or move the blue guess dot (until it is submitted)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || submitted || !locked) return;
+
+    const onClick = (e) => {
+      const { lat, lng } = e.latlng;
+      setGuess({ lat, lng, submitted: false, score: null });
+    };
+    map.on("click", onClick);
+    return () => map.off("click", onClick);
+  }, [ready, index, submitted, locked]);
+
+  // Draw the blue guess dot for this map; draggable until submitted
+  useEffect(() => {
+    if (!ready || !guessLayerRef.current) return;
+    guessLayerRef.current.clearLayers();
+    if (!guess || !locked) return; // hidden while in freeroam
+
+    const marker = L.marker([guess.lat, guess.lng], {
+      draggable: !guess.submitted,
+      keyboard: false,
+      icon: L.divIcon({
+        className: `page3-guess${guess.submitted ? " is-submitted" : ""}`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      }),
+    }).addTo(guessLayerRef.current);
+
+    if (!guess.submitted) {
+      marker.on("dragend", () => {
+        const { lat, lng } = marker.getLatLng();
+        setGuess((prev) => (prev ? { ...prev, lat, lng } : prev));
+      });
+    }
+  }, [ready, index, guess, locked]);
+
+  // Lock / unlock zoom and movement
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
 
     HANDLERS.forEach((name) => {
       if (map[name]) locked ? map[name].disable() : map[name].enable();
     });
 
-    // Hide the +/- buttons while locked so zoom can't be changed that way either
     if (zoomRef.current) {
       zoomRef.current.getContainer().style.display = locked ? "none" : "";
     }
-  }, [locked]);
+  }, [ready, locked]);
 
-  useEffect(() => () => clearTimeout(noticeTimer.current), []);
-
-  const handleLockClick = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    // Unlocking is always allowed; locking needs enough zoom
-    if (!locked && map.getZoom() < LOCK_MIN_ZOOM) {
-      setNotice("Zoom in further before locking the map.");
-      clearTimeout(noticeTimer.current);
-      noticeTimer.current = setTimeout(() => setNotice(""), 3500);
-      return;
-    }
-    setNotice("");
-    setLocked((v) => !v);
+  // Sequential cycle: 1 -> 2 -> ... -> 15 -> 1
+  // Changing maps always lands on the locked, fixed view and forgets the guess
+  const go = (delta) => {
+    setGuess(null);
+    setLocked(true);
+    setIndex((i) => (i + delta + MAPS.length) % MAPS.length);
   };
 
-  const handleClear = () => {
-    layerRef.current?.clearLayers();
-    counterRef.current = 0;
-    setPoints([]);
+  const handleModeClick = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (locked) {
+      // Entering freeroam forgets the guess and score
+      setGuess(null);
+      setLocked(false);
+    } else {
+      // Locking snaps back to this map's fixed fragment
+      applyView(map, current);
+      setLocked(true);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!locked || !guess || submitted) return;
+    const score = Math.floor(Math.random() * 101); // random 0-100 for now
+    setGuess((prev) => ({ ...prev, submitted: true, score }));
   };
 
   return (
     <div className="page3">
       <div ref={containerRef} className="page3-map" />
 
-      <button
-        type="button"
-        className={`page3-lock${locked ? " is-locked" : ""}`}
-        onClick={handleLockClick}
-        aria-pressed={locked}
-      >
-        {locked ? "Unlock" : "Lock"}
-      </button>
-
-      {notice && (
-        <div className="page3-notice" role="alert">
-          {notice}
+      {locked && (
+        <div className="page3-score" aria-live="polite">
+          <span>Score</span>
+          <strong>{submitted ? guess.score : "–"}</strong>
         </div>
       )}
 
-      <aside className="page3-panel" aria-label="Clicked coordinates">
-        <div className="page3-panel-head">
-          <h2>Clicked points ({points.length})</h2>
-          <button
-            type="button"
-            className="page3-clear"
-            onClick={handleClear}
-            disabled={points.length === 0}
-          >
-            Clear
+      <div className="page3-topright">
+        <div className="page3-cycle">
+          <button type="button" onClick={() => go(-1)} aria-label="Previous map">
+            ‹
+          </button>
+          <span className="page3-label">
+            Map {current.id} of {MAPS.length}
+          </span>
+          <button type="button" onClick={() => go(1)} aria-label="Next map">
+            ›
           </button>
         </div>
 
-        {points.length === 0 ? (
-          <p className="page3-empty">Click the map to record a point.</p>
-        ) : (
-          <ol className="page3-points">
-            {points.map((p) => (
-              <li key={p.id}>
-                <span className="page3-num">{p.id}.</span>
-                <span>
-                  {fmt(p.lat)}, {fmt(p.lng)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </aside>
+        <button
+          type="button"
+          className={`page3-lock${locked ? "" : " is-freeroam"}`}
+          onClick={handleModeClick}
+        >
+          {locked ? "FREEROAM" : "Lock"}
+        </button>
+
+        <button
+          type="button"
+          className="page3-submit"
+          onClick={handleSubmit}
+          disabled={!locked || !guess || submitted}
+        >
+          {submitted ? "GUESS SUBMITTED" : "SUBMIT GUESS"}
+        </button>
+      </div>
 
       <nav className="page3-nav" aria-label="Main">
         <a href="#/">Landing</a>
