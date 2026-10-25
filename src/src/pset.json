@@ -1,5 +1,0 @@
-[
-    {"cid": "9387","cmpdname": "Perfluorooctane","smiles": "C(C(C(C(C(F)(F)F)(F)F)(F)F)(F)F)(C(C(C(F)(F)F)(F)F)(F)F)(F)F"},
-	{"cid": "9388","cmpdname": "Perfluorooctanesulfonyl fluoride","smiles": "C(C(C(C(C(F)(F)S(=O)(=O)F)(F)F)(F)F)(F)F)(C(C(C(F)(F)F)(F)F)(F)F)(F)F"},
-    {"cid": "9389","cmpdname": "Perfluorodecyl bromide","smiles": "C(C(C(C(C(C(F)(F)Br)(F)F)(F)F)(F)F)(F)F)(C(C(C(C(F)(F)F)(F)F)(F)F)(F)F)(F)F"}
-]
