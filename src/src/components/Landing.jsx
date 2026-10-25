@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './landing.css'
-import { ArrowUpRight, Beaker, FlaskConical, Play, ScanLine, Waves } from 'lucide-react'
+import { ArrowUpRight, Beaker, Droplets, FlaskConical, Hexagon, Link2, Play, ScanLine, ShieldCheck, Waves } from 'lucide-react'
 import { createHost, disposeViewer, load3Dmol, loadRDKit } from '../viewerUtils.js'
 
 function Mark() {
@@ -81,10 +81,17 @@ function MolecularViewer() {
   </div>
 }
 
+const basics = [
+  ['01', Link2, 'Atoms connect by sharing.', 'A chemical bond forms when atoms share electrons. The tighter the grip, the harder the bond is to break.', 'dark'],
+  ['02', Hexagon, 'Life runs on carbon-hydrogen.', 'Fats, sugars, and fuels are carbon chains lined with hydrogen. Nature has tools, like enzymes and microbes, that can break these bonds.', 'warm'],
+  ['03', ShieldCheck, 'Swap hydrogen for fluorine.', 'PFAS replace hydrogen with fluorine, creating carbon-fluorine bonds, among the strongest in organic chemistry. Almost nothing in nature can break them.', 'lime'],
+  ['04', Droplets, 'One end repels, one end attracts.', 'Many PFAS have a fluorinated tail that repels water and oil, and a head drawn to water. That split makes them excellent at repelling and spreading.', 'dark'],
+]
+
 const facts = [
-  ['01', Waves, 'It travels through water.', 'PFAS can move through soil into groundwater, wells, rivers, and drinking-water supplies.'],
-  ['02', ScanLine, 'Cumulative exposure matters.', 'Repeated, low-level contact can contribute to a body burden over time; some PFAS have been associated with immune, cholesterol, and developmental effects.'],
-  ['03', FlaskConical, 'The chemistry lasts.', 'Many PFAS resist environmental breakdown and can remain present for years, turning a single release into a long-term exposure concern.'],
+  ['01', Waves, 'It travels through water.', 'Due to their nature, PFAS move easily through soil into groundwater, wells, rivers, and drinking water. Once they\’re in, they go the distance.'],
+  ['02', ScanLine, 'Small exposures add up.', 'Your body can build up PFAS over time, even from low-level exposure. Some PFAS have been linked to effects on the immune system, cholesterol, and child development.'],
+  ['03', FlaskConical, 'The chemistry lasts.', 'The carbon-fluorine bond is so strong that many PFAS last for years in the environment. One release can become a long-term problem.'],
 ]
 
 export default function Landing() {
@@ -100,7 +107,7 @@ export default function Landing() {
       <div className="scroll-line"><span style={{ transform: `scaleX(${progress})` }} /></div>
       <nav className="topbar">
         <a className="wordmark" href="#top"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
-        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#why">Why it matters</a></div>
+        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#what">What is it</a><a href="#why">Why it matters</a></div>
       </nav>
 
       <section className="hero wrap" id="top">
@@ -114,6 +121,25 @@ export default function Landing() {
       </section>
 
       <section className="signal-strip"><div className="wrap signal-inner"><strong>LEARN BY LOOKING CLOSER</strong><span>Carbon–fluorine bonds, made visible.</span></div></section>
+
+      <section className="bento what wrap" id="what">
+        <div className="section-heading">
+          <span className="eyebrow">What is it</span>
+          <h2>Built on carbon.<br /><span>Armored in fluorine.</span></h2>
+          <p className="what-intro">PFAS are a family of thousands of synthetic chemicals. To see why they behave the way they do, start with how atoms connect.</p>
+        </div>
+        <div className="what-grid">
+          {basics.map(([number, Icon, title, copy, tone]) => (
+            <article className={`hex tone-${tone}`} key={number}>
+              <div className="hex-inner">
+                <div className="hex-meta"><span>{number}</span><Icon size={16} /></div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="bento wrap" id="why"><div className="section-heading"><span className="eyebrow">Why it matters</span><h2>Invisible by design.<br /><span>Persistent by chemistry.</span></h2></div><div className="bento-grid">{facts.map(([number, Icon, title, copy]) => <article className={`bento-item ${number === '01' ? 'bento-wide' : number === '02' ? 'bento-dark' : 'bento-accent'}`} key={number}><div className="bento-meta"><span>{number}</span><Icon size={18} /></div><h3>{title}</h3><p>{copy}</p>{number === '01' && <div className="water-lines" />}</article>)}</div></section>
 
