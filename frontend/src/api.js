@@ -1,4 +1,5 @@
-const BASE = "foreverguesser-backend:10000";
+// const BASE = "foreverguesser-backend:10000";
+const BASE = import.meta.env.VITE_API_URL ?? ""
 
 export async function getMolecule(smiles) {
   let res;
