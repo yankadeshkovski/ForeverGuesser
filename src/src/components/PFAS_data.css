@@ -34,7 +34,7 @@
 .data .grid-head,
 .data .grid-row {
   display: grid;
-  grid-template-columns: 64px minmax(160px, 300px) minmax(0, 1fr);
+  grid-template-columns: 72px minmax(160px, 300px) minmax(0, 1fr);
   gap: 16px;
   padding: 0 18px;
   align-items: center;
@@ -71,3 +71,22 @@
   .data .grid-head, .data .grid-row { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 0 12px; }
   .data .grid-head div:nth-child(3), .data .smiles-cell { display: none; }
 }
+
+/* ── Search, states, copy ──────────────────── */
+.data-search {
+  display: flex; align-items: center; gap: 10px; height: 44px; margin-bottom: 14px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 5px; background: rgba(255, 255, 255, .035); color: var(--muted);
+  transition: border-color .25s, box-shadow .25s, color .25s;
+}
+.data-search:focus-within { color: var(--lime); border-color: var(--lime); box-shadow: 0 0 0 3px rgba(212, 255, 85, .12); }
+.data-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--paper); font: 12px 'DM Mono', monospace; }
+.data-search input::placeholder { color: #6d6f68; }
+.data-search input::-webkit-search-cancel-button { filter: invert(.7); cursor: pointer; }
+.data-tip { margin-left: 10px; color: #6d6f68; letter-spacing: .04em; text-transform: none; }
+.data-empty { padding: 48px 24px; text-align: center; color: var(--muted); font: 12px 'DM Mono', monospace; }
+.data-empty.is-error { color: #ffb3aa; }
+.data .grid-row { cursor: pointer; }
+.data .grid-row:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+.data .grid-row.is-copied { background: rgba(212, 255, 85, .12); }
+.copied-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--lime); }
+@media (max-width: 760px) { .data-tip { display: none; } }
