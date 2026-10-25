@@ -1,4 +1,4 @@
-const BASE = "http://localhost:8000";
+const BASE = "https://foreverguesser-backend.onrender.com/";
 
 export async function getMolecule(smiles) {
   let res;

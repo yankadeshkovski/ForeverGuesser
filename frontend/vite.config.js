@@ -9,6 +9,6 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] })
   ],
   server: {
-    proxy: { '/api': 'http://localhost:8000' },
+    proxy: { '/api': 'https://foreverguesser-backend.onrender.com/' },
   },
 })
