@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './landing.css'
 import { ArrowUpRight, Beaker, Droplets, Flame, FlaskConical, Hexagon, Home, Link2, Play, ScanLine, ShieldCheck, Utensils, Waves } from 'lucide-react'
 import { createHost, disposeViewer, load3Dmol, loadRDKit } from '../viewerUtils.js'
+import Faq from './Faq'
 
 function Mark() {
   return (
@@ -113,7 +114,7 @@ export default function Landing() {
       <div className="scroll-line"><span style={{ transform: `scaleX(${progress})` }} /></div>
       <nav className="topbar">
         <a className="wordmark" href="#top"><Mark /><span>FOREVER<br /><i>GUESSER</i></span></a>
-        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#what">What is it</a><a href="#why">Why it matters</a></div>
+        <div className="nav-links"><a href="#/page2">Talk with Atom</a><a href="#/page3">Play Guesser</a><a href="#what">What is it</a><a href="#why">Why it matters</a><a href="#faq">FAQ</a></div>
       </nav>
 
       <section className="hero wrap" id="top">
@@ -135,10 +136,10 @@ export default function Landing() {
           <p className="what-intro">PFAS are a family of thousands of synthetic chemicals. To see why they behave the way they do, start with how atoms connect.</p>
         </div>
         <div className="what-grid">
-          {basics.map(([number, Icon, title, copy, tone]) => (
+          {basics.map(([number, , title, copy, tone]) => (
             <article className={`hex tone-${tone}`} key={number}>
               <div className="hex-inner">
-                <div className="hex-meta"><span>{number}</span><Icon size={16} /></div>
+                <div className="hex-meta"><span>{number}</span></div>
                 <h3>{title}</h3>
                 <p>{copy}</p>
               </div>
@@ -157,7 +158,7 @@ export default function Landing() {
           {problems.map(([number, Icon, title, copy, tone]) => (
             <article className={`hex tone-${tone}`} key={number}>
               <div className="hex-inner">
-                <div className="hex-meta"><span>{number}</span><Icon size={16} /></div>
+                <div className="hex-meta"><Icon size={22} /></div>
                 <h3>{title}</h3>
                 <p>{copy}</p>
               </div>
@@ -167,6 +168,8 @@ export default function Landing() {
       </section>
 
       <section className="bento wrap" id="why"><div className="section-heading"><span className="eyebrow">Why it matters</span><h2>Invisible by design.<br /><span>Persistent by chemistry.</span></h2></div><div className="bento-grid">{facts.map(([number, Icon, title, copy]) => <article className={`bento-item ${number === '01' ? 'bento-wide' : number === '02' ? 'bento-dark' : 'bento-accent'}`} key={number}><div className="bento-meta"><span>{number}</span><Icon size={18} /></div><h3>{title}</h3><p>{copy}</p>{number === '01' && <div className="water-lines" />}</article>)}</div></section>
+
+      <Faq />
 
       <section className="experiences wrap" id="sandbox"><div className="section-heading"><span className="eyebrow">Look closer</span><h2>Start with a molecule.<br /><span>Leave with a map.</span></h2></div><div className="experience-list">
         <a className="experience-row" href="#/page2"><span className="experience-index">01</span><div className="experience-panel"><div className="panel-kicker"><Beaker size={14} /> MOLECULAR CONTEXT</div><h3>Talk with Atom</h3><p>Enter a compound, see its structure rendered in 3D, and let AI explain what it is, whether it is PFAS, where it is commonly found, and why that context matters.</p><span className="experience-action">Explore the compound <ArrowUpRight size={14} /></span></div><ArrowUpRight /></a>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./page3.css";
-import { ArrowRight, Beaker, Home, Play, Send } from "lucide-react";
+import { ArrowRight, Beaker, Play, Send } from "lucide-react";
 import { MAPS, POINTS_BY_MAP } from "./mapsData";
 import { getHeatmap, askZone } from "../api"; // adjust the path to wherever api.js lives
 
@@ -57,11 +57,28 @@ const MAP_RATIO = 4 / 3;
 const MAP_RATIO_NARROW = 1; // phones: a squarer box keeps the map big enough
 const BREAKPOINT = 760;
 
-// Fit bounds with no zoom snapping, so the area fills the box instead of stopping up to a quarter-zoom short
-function fitExact(map, bounds) {
+// Frame the heat map so it covers the whole map box at any box shape: zoom until the heat area is at least as big
+// as the box (no empty bands), then slide the view toward the guess and the X while staying inside the heat area.
+function fitCover(map, heat) {
+  const bounds = L.latLngBounds(heat.bounds);
   const snap = map.options.zoomSnap;
-  map.options.zoomSnap = 0;
-  map.fitBounds(bounds, { animate: false });
+  map.options.zoomSnap = 0; // exact zoom, no rounding to a quarter step
+  const zoom = map.getBoundsZoom(bounds, true);
+
+  const focus = [heat.guess, heat.peak].filter(Boolean);
+  const target = focus.length
+    ? L.latLng(focus.reduce((a, p) => a + p.lat, 0) / focus.length, focus.reduce((a, p) => a + p.lng, 0) / focus.length)
+    : bounds.getCenter();
+
+  const size = map.getSize();
+  const nw = map.project(bounds.getNorthWest(), zoom);
+  const se = map.project(bounds.getSouthEast(), zoom);
+  const p = map.project(target, zoom);
+  const clamp = (v, lo, hi) => (lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)));
+  const cx = clamp(p.x, nw.x + size.x / 2, se.x - size.x / 2);
+  const cy = clamp(p.y, nw.y + size.y / 2, se.y - size.y / 2);
+
+  map.setView(map.unproject(L.point(cx, cy), zoom), zoom, { animate: false });
   map.options.zoomSnap = snap;
 }
 
@@ -172,7 +189,7 @@ export default function Page3() {
   const guessLayerRef = useRef(null); // the guess dot
   const peakLayerRef = useRef(null); // the X marking where the 100 is
   const lockedRef = useRef(LOCKED);
-  const heatBoundsRef = useRef(null); // bounds of the heat map on screen, or null
+  const heatRef = useRef(null); // the heat map on screen, or null
   const slotRef = useRef(null); // the grid cell the map box is centered in
   const [box, setBox] = useState(null); // { w, h } px of the fixed-shape map box
   const indexRef = useRef(0);
@@ -213,7 +230,7 @@ export default function Page3() {
   const worst = finished ? entries.reduce((a, b) => (b.score < a.score ? b : a)) : null;
   const avg = count ? Math.round(total / count) : 0;
   chatsRef.current = chats;
-  heatBoundsRef.current = heat?.bounds ?? null;
+  heatRef.current = heat ?? null;
   const chat = chats[current.id];
   const chatMsgs = chat?.messages ?? [];
   const chatStatus = chat?.status ?? "idle";
@@ -308,7 +325,7 @@ export default function Page3() {
       map.invalidateSize({ animate: false });
       if (!lockedRef.current) return;
       // With a heat map showing, keep the whole heat map in view; otherwise the map's saved view
-      if (heatBoundsRef.current) fitExact(map, heatBoundsRef.current);
+      if (heatRef.current) fitCover(map, heatRef.current);
       else applyView(map, MAPS[indexRef.current]);
     });
     ro.observe(containerRef.current);
@@ -342,7 +359,7 @@ export default function Page3() {
     const map = mapRef.current;
     if (!ready || !map || !heat || !locked) return;
     map.invalidateSize({ animate: false });
-    fitExact(map, heat.bounds);
+    fitCover(map, heat);
   }, [ready, heat, locked]);
 
   // Red points: locked = only this map's, with always-visible name tags.
@@ -822,7 +839,7 @@ export default function Page3() {
       )}
 
       <nav className="p3-dock" aria-label="Main">
-        <a href="#/"><Home size={14} /> Home</a>
+        <a href="#/"><Mark /> Home</a>
         <a href="#/page2"><Beaker size={14} /> Talk with Atom</a>
         <a href="#/page3" aria-current="page"><Play size={13} fill="currentColor" /> Play Guesser</a>
       </nav>
